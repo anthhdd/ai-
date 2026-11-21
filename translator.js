@@ -76,19 +76,20 @@ async function runTranslation(){
   for(let i=0;i<chunks.length;i++){if(cancelRequested)throw new Error("Proceso cancelado.");translated.push(await translateText(chunks[i].text.trim()));setProgress(35+(i+1)/chunks.length*25,"Traduciendo frase "+(i+1)+" de "+chunks.length+"…");}
   if(cancelRequested)throw new Error("Proceso cancelado.");
   step("voice");setProgress(61,"Preparando voz española…");const tts=await loadSynthesizer();
-  const dubbed=new Float32Array(Math.ceil((probe.duration+1)*16000));
+  const dubbed=new Float32Array(Math.ceil((probe.duration+1)*16000));let fallbackCursor=0;
   for(let i=0;i<translated.length;i++){
    if(cancelRequested)throw new Error("Proceso cancelado.");
    const spoken=await tts(translated[i]);
    if(!spoken?.audio?.length)throw new Error("El modelo de voz no ha generado audio.");
    let samples=spoken.sampling_rate===16000?spoken.audio:resampleAudio(spoken.audio,spoken.sampling_rate,16000);
-   const startSec=Number(chunks[i].timestamp?.[0]??0);
-   const nextStart=i+1<chunks.length?Number(chunks[i+1].timestamp?.[0]??probe.duration):probe.duration;
+   const rawStart=chunks[i].timestamp?.[0];const startSec=Number.isFinite(rawStart)?rawStart:fallbackCursor;
+   const rawNext=i+1<chunks.length?chunks[i+1].timestamp?.[0]:probe.duration;const nextStart=Number.isFinite(rawNext)?rawNext:probe.duration;
    const start=Math.max(0,Math.round(startSec*16000));
    const available=Math.max(0,Math.min(dubbed.length-start,Math.round((nextStart-startSec)*16000)));
    if(available>0&&samples.length>available)samples=resampleAudio(samples,Math.round(16000*samples.length/available),16000);
    const count=Math.min(samples.length,dubbed.length-start);
    if(count>0)for(let j=0;j<count;j++)dubbed[start+j]=samples[j];
+   fallbackCursor=Math.max(startSec+samples.length/16000,nextStart);
    setProgress(63+(i+1)/translated.length*20,"Generando doblaje "+(i+1)+" de "+translated.length+"…");
   }
   step("export");setProgress(85,"Creando MP4 con voz española…");
