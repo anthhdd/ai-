@@ -533,29 +533,33 @@ async function generateSvg(prompt) {
   const clean = m[0].replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, "");
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(clean);
 }
-let localImageClient = null, localImageLoading = null, localImageReady = false;
+let localImageModule = null, localImageLoading = null, localImageReady = false;
 async function ensureLocalImageModel(onProgress = () => {}) {
   if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
-  if (localImageClient && localImageReady) return localImageClient;
+  if (localImageModule && localImageReady) return localImageModule;
   if (localImageLoading) return localImageLoading;
   localImageLoading = (async () => {
-    onProgress("Preparando el motor de imágenes local…");
-    const mod = await import("https://esm.sh/web-txt2img@latest");
-    const Client = mod.Txt2ImgWorkerClient || mod.default?.Txt2ImgWorkerClient;
-    if (!Client) throw new Error("No se pudo cargar el motor local de imágenes.");
-    const client = Client.createDefault();
-    const caps = await client.detect();
+    onProgress("Preparando el motor local de imágenes…");
+    // Cargamos la API directa, no el Worker remoto: GitHub Pages bloquea workers de otro origen.
+    const mod = await import("https://esm.sh/web-txt2img@0.3.1?bundle");
+    if (typeof mod.loadModel !== "function" || typeof mod.generateImage !== "function") {
+      throw new Error("La versión del motor local no ofrece la API directa necesaria.");
+    }
+    const caps = await mod.detectCapabilities();
     if (!caps || !caps.webgpu) throw new Error("WebGPU no está disponible en este navegador. Activa la aceleración gráfica o prueba en un dispositivo compatible.");
     onProgress("Descargando SD-Turbo en este dispositivo (solo la primera vez)…");
-    const loaded = await client.load("sd-turbo", { backendPreference: ["webgpu"] }, p => {
-      const pct = Number.isFinite(p.pct) ? Math.round(p.pct) + "%" : "";
-      const mb = p.bytesDownloaded && p.totalBytesExpected ? " · " + (p.bytesDownloaded / 1048576).toFixed(0) + "/" + (p.totalBytesExpected / 1048576).toFixed(0) + " MB" : "";
-      onProgress((p.message || "Descargando modelo") + (pct ? " " + pct : "") + mb);
+    const loaded = await mod.loadModel("sd-turbo", {
+      backendPreference: ["webgpu"],
+      onProgress: p => {
+        const pct = Number.isFinite(p.pct) ? Math.round(p.pct) + "%" : "";
+        const mb = p.bytesDownloaded && p.totalBytesExpected ? " · " + (p.bytesDownloaded / 1048576).toFixed(0) + "/" + (p.totalBytesExpected / 1048576).toFixed(0) + " MB" : "";
+        onProgress((p.message || "Descargando modelo") + (pct ? " " + pct : "") + mb);
+      }
     });
     if (!loaded || !loaded.ok) throw new Error(loaded?.message || "No se pudo cargar SD-Turbo. Puede faltar memoria gráfica.");
-    localImageClient = client;
+    localImageModule = mod;
     localImageReady = true;
-    return client;
+    return mod;
   })();
   try { return await localImageLoading; }
   finally { localImageLoading = null; }
@@ -576,10 +580,14 @@ async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {}
   const client = await ensureLocalImageModel(onProgress);
   const styledPrompt = prompt + (IMG_STYLES[style] || "");
   onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
-  const task = client.generate({ prompt: styledPrompt, seed: seed || Math.floor(Math.random() * 1000000) }, p => {
-    onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"));
-  }, { busyPolicy: "queue", debounceMs: 100 });
-  const result = await task.promise;
+  const result = await client.generateImage({
+    model: "sd-turbo",
+    prompt: styledPrompt,
+    seed: seed || Math.floor(Math.random() * 1000000),
+    width: 512,
+    height: 512,
+    onProgress: p => onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"))
+  });
   if (!result || !result.ok || !result.blob) throw new Error(result?.message || "La generación local ha fallado. Cierra otras pestañas e inténtalo de nuevo.");
   return { url: await blobToDataUrl(result.blob), kind: "local-ai" };
 }
