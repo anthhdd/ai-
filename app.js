@@ -813,6 +813,119 @@ window.addEventListener("message", (e) => {
   }
 });
 
+/* ---------- NUBI Clip Studio: edición local de clips ---------- */
+let clipObjectUrl = null, clipSourceFile = null, clipRenderFrame = 0, clipRecorder = null, clipRenderUrl = null;
+const clipVideo = $("clipVideo"), clipCanvas = $("clipCanvas"), clipCtx = clipCanvas.getContext("2d", { alpha: false });
+function stopClipPreview() { cancelAnimationFrame(clipRenderFrame); if (clipVideo && !clipVideo.paused) clipVideo.pause(); }
+function clipTime(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+function drawClipFrame() {
+  if (!clipSourceFile || !clipVideo.videoWidth) return;
+  const W = clipCanvas.width, H = clipCanvas.height, vw = clipVideo.videoWidth, vh = clipVideo.videoHeight;
+  const zoom = Number($("clipZoom").value) || 1;
+  const base = Math.max(W / vw, H / vh), scale = base * zoom;
+  const sw = W / scale, sh = H / scale;
+  const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+  clipCtx.fillStyle = "#05070c"; clipCtx.fillRect(0,0,W,H);
+  clipCtx.drawImage(clipVideo,sx,sy,sw,sh,0,0,W,H);
+  const caption = $("clipCaption").value.trim();
+  if (caption) {
+    const style = $("clipStyle").value, font = style === "clean" ? "700 25px Arial" : "900 30px Arial";
+    const lines = caption.match(/.{1,24}(?:\s|$)/g) || [caption];
+    const shown = lines.slice(0,3).map(x=>x.trim());
+    clipCtx.textAlign = "center"; clipCtx.textBaseline = "middle"; clipCtx.font = font;
+    const y = H * .78, lineH = 36, maxW = W - 34;
+    shown.forEach((line,i)=>{
+      let text=line;
+      while (clipCtx.measureText(text).width>maxW && text.length>4) text=text.slice(0,-2)+"…";
+      const yy=y+(i-(shown.length-1)/2)*lineH;
+      if(style==="clean"){clipCtx.fillStyle="rgba(0,0,0,.55)";clipCtx.fillRect(12,yy-18,W-24,36);}
+      else {clipCtx.lineWidth=5;clipCtx.strokeStyle="#090b12";clipCtx.strokeText(text,W/2,yy,maxW);}
+      clipCtx.fillStyle=style==="neon"?"#8df7ff":"#fff";clipCtx.fillText(text,W/2,yy,maxW);
+    });
+  }
+}
+function refreshClipPreview() {
+  if (!clipSourceFile || !clipVideo.videoWidth) return;
+  const start=clipTime($("clipStart").value), end=clipTime($("clipEnd").value);
+  const target=Math.min(Math.max(start,end-.1),Math.max(0,clipVideo.duration-.05));
+  if(Math.abs(clipVideo.currentTime-target)>.15) clipVideo.currentTime=target;
+  drawClipFrame();
+}
+$("clipFile").addEventListener("change", e=>{
+  const file=e.target.files&&e.target.files[0]; if(!file)return;
+  if(!file.type.startsWith("video/")){toast("Selecciona un archivo de vídeo.");return;}
+  stopClipPreview(); if(clipObjectUrl)URL.revokeObjectURL(clipObjectUrl);
+  clipSourceFile=file; clipObjectUrl=URL.createObjectURL(file);
+  clipVideo.src=clipObjectUrl; clipVideo.hidden=false; $("clipCanvas").hidden=false;
+  $("clipFileLabel").textContent=file.name; $("clipExport").disabled=true;
+  clipVideo.onloadedmetadata=()=>{
+    $("clipDuration").textContent=Math.floor(clipVideo.duration)+" s";
+    $("clipStart").value="0"; $("clipEnd").value=Math.min(30,Math.floor(clipVideo.duration*10)/10);
+    $("clipEnd").max=clipVideo.duration; $("clipStart").max=clipVideo.duration;
+    $("clipStage").querySelector(".web-empty").hidden=true; $("clipExport").disabled=false;
+    refreshClipPreview();
+  };
+  clipVideo.onerror=()=>toast("No se pudo abrir el vídeo. Prueba con MP4 o WebM.");
+});
+["clipStart","clipEnd","clipCaption","clipZoom","clipStyle"].forEach(id=>$(id).addEventListener("input",refreshClipPreview));
+clipVideo.addEventListener("seeked",drawClipFrame);
+$("clipAnalyze").addEventListener("click",async()=>{
+  const transcript=$("clipTranscript").value.trim();
+  if(!clipSourceFile){toast("Sube primero el vídeo que quieras editar.");return;}
+  if(!transcript){toast("Pega una transcripción con tiempos para que la IA pueda encontrar el mejor momento.");$("clipTranscript").focus();return;}
+  const btn=$("clipAnalyze");btn.disabled=true;btn.textContent="✦ Analizando…";
+  const duration=clipVideo.duration||0;
+  try{
+    const prompt="Analiza esta transcripción con marcas de tiempo y elige el fragmento más atractivo para un Short. Prioriza sorpresa, emoción, humor, tensión, reacción o una frase que genere curiosidad. Duración objetivo 15-35 segundos, nunca fuera de 0-"+duration.toFixed(1)+" segundos. Devuelve SOLO JSON válido: {\"start\":numero,\"end\":numero,\"hook\":\"gancho corto en español\",\"reason\":\"motivo breve\"}. Los tiempos deben ser segundos decimales. TRANSCRIPCIÓN:\\n"+transcript;
+    const out=await generate([{role:"system",content:"Eres un editor experto en clips virales para TikTok, Shorts y Reels. No inventes contenido ni tiempos; usa solo las marcas de tiempo dadas. Devuelve JSON válido."},{role:"user",content:prompt}],{temperature:.2,maxTokens:350});
+    const match=out.match(/\{[\s\S]*\}/);if(!match)throw new Error("La IA no devolvió una selección válida.");
+    const pick=JSON.parse(match[0]), start=Math.max(0,Math.min(duration-1,Number(pick.start))), end=Math.max(start+1,Math.min(duration,Number(pick.end)));
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)throw new Error("Los tiempos sugeridos no son válidos.");
+    $("clipStart").value=start.toFixed(1);$("clipEnd").value=end.toFixed(1);
+    $("clipCaption").value=String(pick.hook||"").slice(0,110);
+    const panel=$("clipAnalysis");panel.hidden=false;panel.innerHTML="<b>✦ Momento recomendado: "+start.toFixed(1)+"s – "+end.toFixed(1)+"s</b><p>"+esc(pick.reason||"La IA ha elegido este fragmento.")+"</p>";
+    refreshClipPreview();toast("Momento seleccionado. Puedes ajustar el recorte antes de exportar.");
+  }catch(err){toast(err.message||"No se pudo analizar el texto.");}
+  finally{btn.disabled=false;btn.textContent="✦ Encontrar momento viral";}
+});
+$("clipExport").addEventListener("click",async()=>{
+  if(!clipSourceFile||!clipVideo.videoWidth||clipRecorder&&clipRecorder.state==="recording")return;
+  const start=clipTime($("clipStart").value),end=clipTime($("clipEnd").value);
+  if(end<=start||end>clipVideo.duration+.05){toast("Revisa los tiempos de inicio y final.");return;}
+  const btn=$("clipExport"),progress=$("clipProgress"),bar=$("clipProgressBar");
+  btn.disabled=true;progress.hidden=false;bar.value=0;$("clipProgressText").textContent="Preparando exportación…";
+  try{
+    const stream=clipCanvas.captureStream(24);
+    let combined=[...stream.getVideoTracks()];
+    try{const source=clipVideo.captureStream?clipVideo.captureStream():null;if(source)combined=combined.concat(source.getAudioTracks());}catch(e){}
+    const output=new MediaStream(combined);
+    const mime=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"].find(x=>MediaRecorder.isTypeSupported(x));
+    if(!mime)throw new Error("Este navegador no permite exportar WebM.");
+    const chunks=[];clipRecorder=new MediaRecorder(output,{mimeType:mime,videoBitsPerSecond:1600000});
+    clipRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    const finished=new Promise((resolve,reject)=>{clipRecorder.onstop=()=>resolve(new Blob(chunks,{type:mime}));clipRecorder.onerror=()=>reject(new Error("Error al grabar el clip."));});
+    clipVideo.muted=false;clipVideo.currentTime=start;await new Promise(resolve=>{if(Math.abs(clipVideo.currentTime-start)<.03)resolve();else clipVideo.addEventListener("seeked",resolve,{once:true});});
+    drawClipFrame();clipRecorder.start(250);await clipVideo.play();
+    const tick=()=>{
+      if(clipVideo.currentTime>=end||clipVideo.ended){clipVideo.pause();if(clipRecorder&&clipRecorder.state!=="inactive")clipRecorder.stop();return;}
+      drawClipFrame();bar.value=Math.min(100,((clipVideo.currentTime-start)/(end-start))*100);
+      $("clipProgressText").textContent="Exportando… "+Math.round(bar.value)+"%";
+      clipRenderFrame=requestAnimationFrame(tick);
+    };tick();
+    const blob=await finished;output.getTracks().forEach(t=>t.stop());clipVideo.pause();clipVideo.muted=true;
+    if(clipRenderUrl)URL.revokeObjectURL(clipRenderUrl);clipRenderUrl=URL.createObjectURL(blob);
+    const result=$("clipResult");result.hidden=false;result.innerHTML="";
+    const preview=document.createElement("video");preview.src=clipRenderUrl;preview.controls=true;preview.playsInline=true;
+    const link=document.createElement("a");link.href=clipRenderUrl;link.download="nubi-short.webm";link.className="primary-button";link.textContent="Descargar Short (.webm)";
+    result.append(preview,link);bar.value=100;$("clipProgressText").textContent="¡Clip listo para descargar!";toast("Tu clip está listo.");
+  }catch(err){toast(err.message||"No se pudo exportar el vídeo.");}
+  finally{clipVideo.pause();clipVideo.muted=true;btn.disabled=false;clipRecorder=null;}
+});
+
 /* ---------- archivos ---------- */
 let pdfJsLoading = null;
 function loadPdfJs() {
@@ -887,6 +1000,7 @@ async function runOcr() {
 function setView(name) {
   const previous = document.querySelector(".view.active-view");
   const previousName = previous ? previous.id.replace(/View$/, "") : "";
+  if (previousName === "clips" && name !== "clips") stopClipPreview();
   if (previousName === "video" && name !== "video") {
     const previewVideo = $("videoResult").querySelector("video");
     if (previewVideo) previewVideo.pause();
@@ -900,7 +1014,7 @@ function setView(name) {
   if (name === "video" && videoCode && !$("videoFrame").srcdoc) setVideoPreview();
   if (name === "web" && webCode && !$("webFrame").srcdoc) setPreview(webCode);
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", files: "Archivos y PDF" }[name] || "Chat";
+  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", clips: "Clips virales", files: "Archivos y PDF" }[name] || "Chat";
   $("sidebar").classList.remove("open");
 }
 function autoresize() { promptBox.style.height = "auto"; promptBox.style.height = Math.min(promptBox.scrollHeight, 150) + "px"; }
