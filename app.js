@@ -887,16 +887,21 @@ $("modelSelect").addEventListener("change", (e) => {
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
 });
-// Dictado por voz con Web Speech API (el navegador puede requerir conexión y permiso de micrófono).
+// Dictado por voz con Web Speech API. Requiere HTTPS, conexión y permiso de micrófono.
 const micBtn = $("micBtn"), micStatus = $("micStatus");
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null, micActive = false, dictatedText = "";
+let recognition = null, micActive = false, micStarting = false, dictatedText = "";
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.lang = "es-ES";
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.onstart = () => { micActive = true; micBtn.classList.add("recording"); micBtn.textContent = "■"; micBtn.title = "Detener dictado"; micStatus.textContent = "Te escucho… habla con claridad"; };
+  recognition.maxAlternatives = 1;
+  recognition.onstart = () => {
+    micStarting = false; micActive = true;
+    micBtn.classList.add("recording"); micBtn.textContent = "■";
+    micBtn.title = "Detener dictado"; micStatus.textContent = "Te escucho… habla con claridad";
+  };
   recognition.onresult = (event) => {
     let finalText = "", interimText = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -908,21 +913,56 @@ if (SpeechRecognition) {
     autoresize();
   };
   recognition.onerror = (event) => {
-    const messages = { "not-allowed": "Permite el micrófono en Chrome para usar la voz.", "no-speech": "No he oído nada. Pulsa el micrófono e inténtalo otra vez.", "audio-capture": "No encuentro un micrófono conectado." };
-    micStatus.textContent = messages[event.error] || "No se pudo usar el micrófono. Inténtalo de nuevo.";
+    const messages = {
+      "not-allowed": "Micrófono bloqueado. Pulsa el candado de la dirección web → Micrófono → Permitir.",
+      "service-not-allowed": "Chrome ha bloqueado el servicio de voz. Comprueba los permisos del sitio.",
+      "no-speech": "No he oído nada. Comprueba el micrófono y vuelve a intentarlo.",
+      "audio-capture": "No encuentro un micrófono. Comprueba que el Chromebook tenga uno disponible.",
+      "network": "El reconocimiento de voz necesita conexión a Internet. Comprueba tu conexión.",
+      "aborted": "Dictado detenido."
+    };
+    micStatus.textContent = messages[event.error] || ("Error de voz: " + event.error);
   };
   recognition.onend = () => {
-    micActive = false; micBtn.classList.remove("recording"); micBtn.textContent = "🎙"; micBtn.title = "Hablar con NUBI";
+    micActive = false; micStarting = false;
+    micBtn.classList.remove("recording"); micBtn.textContent = "🎙"; micBtn.title = "Hablar con NUBI";
     if (promptBox.value.trim()) micStatus.textContent = "Dictado listo. Pulsa enviar para hablar con NUBI.";
-    else micStatus.textContent = "Texto · fotos · voz · webs · vídeos · documentos";
+    else if (micStatus.textContent === "Te escucho… habla con claridad") micStatus.textContent = "No se ha recibido voz. Vuelve a intentarlo.";
   };
-  micBtn.addEventListener("click", () => {
+  micBtn.addEventListener("click", async () => {
     if (micActive) { recognition.stop(); return; }
-    dictatedText = promptBox.value.trim() ? promptBox.value.trim() + " " : "";
-    try { recognition.start(); } catch (e) { micStatus.textContent = "Espera un momento y vuelve a pulsar el micrófono."; }
+    if (micStarting) return;
+    if (!window.isSecureContext) {
+      micStatus.textContent = "El micrófono necesita una conexión segura (HTTPS). Abre NUBI desde su dirección https://.";
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      micStatus.textContent = "Este navegador no permite acceder al micrófono. Actualiza Chrome.";
+      return;
+    }
+    micStarting = true; micBtn.disabled = true; micStatus.textContent = "Solicitando permiso para el micrófono…";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      dictatedText = promptBox.value.trim() ? promptBox.value.trim() + " " : "";
+      micStatus.textContent = "Iniciando dictado…";
+      recognition.start();
+    } catch (err) {
+      micStarting = false;
+      const messages = {
+        "NotAllowedError": "No hay permiso. Pulsa el candado junto a la dirección web → Micrófono → Permitir.",
+        "NotFoundError": "No se detecta ningún micrófono conectado.",
+        "NotReadableError": "El micrófono está siendo usado por otra aplicación o pestaña."
+      };
+      micStatus.textContent = messages[err.name] || ("No se pudo abrir el micrófono: " + err.message);
+    } finally {
+      micBtn.disabled = false;
+    }
   });
 } else {
-  micBtn.addEventListener("click", () => { micStatus.textContent = "El dictado por voz no está disponible en este navegador. Prueba Chrome actualizado."; });
+  micBtn.addEventListener("click", () => {
+    micStatus.textContent = "Tu versión de Chrome no admite dictado por voz. Actualiza Chrome y vuelve a probar.";
+  });
 }
 $("sendBtn").addEventListener("click", () => (busy ? stopGeneration() : sendMessage()));
 promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); } });
