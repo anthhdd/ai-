@@ -221,7 +221,7 @@ function wantsYouTube(q) {
   return /youtube|youtu[.]be|vídeos?|videos|tutorial(?:es)?|ver cómo/i.test(q);
 }
 function wantsWebSearch(q) {
-  return /\\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\\b/i.test(q) || looksFactual(q);
+  return /\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\b/i.test(q);
 }
 async function readerText(url, ms = 9000) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), ms);
@@ -254,22 +254,22 @@ async function chatWebContext(query) {
   if (needYT) jobs.push(readerText("https://www.youtube.com/results?search_query=" + encodeURIComponent(query), 10000).then(t => ({ kind: "YouTube", text: t })).catch(() => null));
   if (!needYT || /internet|web|fuentes|investiga|busca/i.test(query)) jobs.push(readerText("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), 10000).then(t => ({ kind: "Web", text: t })).catch(() => null));
   const results = (await Promise.all(jobs)).filter(Boolean);
-  if (!results.length) return "\\n\\nNo se pudo acceder a los buscadores públicos en esta ocasión. No inventes resultados ni afirmes que has buscado.";
-  let context = "\\n\\nRESULTADOS DE BÚSQUEDA (obtenidos ahora, sin API key):";
+  if (!results.length) return "\n\nNo se pudo acceder a los buscadores públicos en esta ocasión. No inventes resultados ni afirmes que has buscado.";
+  let context = "\n\nRESULTADOS DE BÚSQUEDA (obtenidos ahora, sin API key):";
   for (const result of results) {
     const links = extractSearchLinks(result.text, result.kind === "YouTube");
-    context += "\\n\\n" + result.kind + ":";
-    if (!links.length) { context += "\\n" + result.text.slice(0, 3000); continue; }
+    context += "\n\n" + result.kind + ":";
+    if (!links.length) { context += "\n" + result.text.slice(0, 3000); continue; }
     const picked = links.slice(0, result.kind === "YouTube" ? 4 : 3);
     const pages = await Promise.all(picked.map(async link => {
       try { return await readerText(link.url, 6500); } catch (e) { return ""; }
     }));
     picked.forEach((link, i) => {
-      context += "\\n- " + link.title + " — " + link.url;
-      if (pages[i]) context += "\\n  Contenido recuperado: " + pages[i].replace(/\\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
+      context += "\n- " + link.title + " — " + link.url;
+      if (pages[i]) context += "\n  Contenido recuperado: " + pages[i].replace(/\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
     });
   }
-  context += "\\n\\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
+  context += "\n\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
   return context.slice(0, 8500);
 }
 async function wikiContext(query, ms = 3500) {
