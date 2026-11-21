@@ -896,7 +896,6 @@ $("videoRecord").addEventListener("click", () => {
   const f = $("videoFrame"); if (!videoCode || !f.contentWindow) return;
   $("videoRecord").disabled = true; $("videoRecord").textContent = "⏺ Grabando… 0%"; f.contentWindow.postMessage({ cmd: "record" }, "*");
 });
-$("pollKey").addEventListener("change", (e) => { const v = e.target.value.trim(); if (v) store.set("nubi-pkey", v); else store.del("nubi-pkey"); toast(v ? "Clave guardada en este navegador" : "Clave borrada"); });
 $("fileInput").addEventListener("change", (e) => { if (e.target.files[0]) processFile(e.target.files[0]); });
 const drop = $("dropZone");
 ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.style.borderColor = "#a99aff"; }));
