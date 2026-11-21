@@ -202,7 +202,7 @@ async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTo
       if (stopRequested) return "";
       if (!navigator.gpu) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + ") y tu navegador no admite IA local. Inténtalo en unos minutos.");
       toast("La nube no responde. Usando IA local (la primera vez descarga el modelo)…");
-      return await localChat(messages, { onToken, base: "1.5B", temperature, maxTokens });
+      return await localChat(messages, { onToken, base: "0.5B", temperature, maxTokens });
     }
   }
   return localChat(messages, { onToken, base: MODES[mode].base, temperature, maxTokens });
@@ -745,7 +745,7 @@ function videoHarness(code, W, H, dur) {
   'if(rec&&(n++%8===0))parent.postMessage({type:"nubi-progress",p:Math.min(1,t/DUR)},"*");requestAnimationFrame(frame);}' +
   'function startRec(){if(rec)return;const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];' +
   'const mt=window.MediaRecorder&&types.find(x=>MediaRecorder.isTypeSupported(x));if(!mt){err("Tu navegador no puede grabar vídeo. Usa Chrome, Edge o Firefox.");return;}' +
-  'mr=new MediaRecorder(cv.captureStream(30),{mimeType:mt,videoBitsPerSecond:6000000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
+  'mr=new MediaRecorder(cv.captureStream(24),{mimeType:mt,videoBitsPerSecond:3500000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
   'mr.onstop=()=>{parent.postMessage({type:"nubi-video",blob:new Blob(chunks,{type:mt.split(";")[0]})},"*");};mr.start(250);start=performance.now();rec=true;}' +
   'addEventListener("message",e=>{if(e.data&&e.data.cmd==="record")startRec();});requestAnimationFrame(frame);' +
   '<\/script></body></html>';
@@ -873,6 +873,7 @@ $("clearData").addEventListener("click", () => {
 });
 $("videoPlatform").addEventListener("change", (e) => { const p = VIDEO_PRESETS[e.target.value]; if (p) { $("videoRatio").value = p.ratio; $("videoDur").value = p.duration; if (videoCode) setVideoPreview(); } });
 $("modelSelect").addEventListener("change", (e) => {
+  if (e.target.value === "cloud") releaseLocalTextEngine();
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
 });
