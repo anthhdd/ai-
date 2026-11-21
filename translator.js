@@ -4,8 +4,8 @@ const $t = (id) => document.getElementById(id);
 const fileInput = $t("translateFile");
 
 let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, synthesizer = null, outputUrl = null, previewUrl = null, translationAbort = null;
-const MAX_BYTES = 60 * 1024 * 1024;
-const MAX_SECONDS = 180;
+const MAX_BYTES = 150 * 1024 * 1024;
+const MAX_SECONDS = 20 * 60;
 const setStatus = (s) => { $t("translateStatus").textContent=s; $t("translateState").textContent=s; };
 const setProgress = (p,s) => { $t("translateProgress").hidden=false; $t("translatePercent").textContent=Math.round(p)+"%"; $t("translateBar").style.width=Math.max(0,Math.min(100,p))+"%"; if(s)setStatus(s); };
 function step(name){const order=["load","transcribe","translate","voice","export"];document.querySelectorAll("#translateSteps [data-step]").forEach(el=>{el.classList.toggle("active",el.dataset.step===name);if(name==="complete"||order.indexOf(el.dataset.step)<order.indexOf(name))el.classList.add("done");});}
@@ -15,7 +15,7 @@ fileInput.addEventListener("change",()=>{
  const f=fileInput.files?.[0]; selectedVideo=null; $t("translateGo").disabled=true; $t("translateMeta").hidden=true; if(previewUrl)URL.revokeObjectURL(previewUrl); previewUrl=null;
  if(!f)return;
  if(!/^video\//.test(f.type)&&! /\.(mp4|mov|webm)$/i.test(f.name)){alert("Selecciona un vídeo MP4, MOV o WEBM.");fileInput.value="";return;}
- if(f.size>MAX_BYTES){alert("El vídeo supera 60 MB. Usa un clip más corto o comprimido para no bloquear Chrome.");fileInput.value="";return;}
+ if(f.size>MAX_BYTES){alert("El vídeo supera 150 MB. Comprímelo o reduce su resolución para que Chrome no se quede sin memoria.");fileInput.value="";return;}
  selectedVideo=f;$t("translateFileHint").textContent=f.name;$t("translateMeta").hidden=false;
  $t("translateMeta").textContent=(f.size/1024/1024).toFixed(1)+" MB · "+f.type;
  $t("translateGo").disabled=false;$t("translateState").textContent="Vídeo listo";
@@ -60,7 +60,7 @@ async function runTranslation(){
   setProgress(2,"Comprobando duración…");
   const probe=document.createElement("video");probe.preload="metadata";audioUrl=URL.createObjectURL(selectedVideo);probe.src=audioUrl;
   await new Promise((resolve,reject)=>{probe.onloadedmetadata=resolve;probe.onerror=()=>reject(new Error("No se puede leer este vídeo. Prueba con MP4 H.264."));});
-  if(!Number.isFinite(probe.duration)||probe.duration>MAX_SECONDS)throw new Error("El vídeo dura más de 3 minutos. Usa un clip más corto para proteger la memoria del Chromebook.");
+  if(!Number.isFinite(probe.duration)||probe.duration>MAX_SECONDS)throw new Error("El vídeo supera el máximo de 20 minutos. Si tu Chromebook tiene poca memoria, prueba primero con vídeos cortos.");
   step("load");setProgress(4,"Cargando IA para reconocer el inglés…");const asr=await loadTranscriber();if(cancelRequested)throw new Error("Proceso cancelado.");
   step("transcribe");setProgress(25,"Extrayendo audio inglés…");const ff=await loadFFmpeg();
   const ext=(selectedVideo.name.split(".").pop()||"mp4").toLowerCase();const input="source."+ext;
