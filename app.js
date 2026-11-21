@@ -864,7 +864,7 @@ function setView(name) {
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", files: "Archivos y PDF" }[name] || "Chat";
+  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", translate: "Traducir vídeos", files: "Archivos y PDF" }[name] || "Chat";
   $("sidebar").classList.remove("open");
 }
 function autoresize() { promptBox.style.height = "auto"; promptBox.style.height = Math.min(promptBox.scrollHeight, 150) + "px"; }
