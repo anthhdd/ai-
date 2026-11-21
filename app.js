@@ -855,6 +855,7 @@ async function processFile(file) {
         const content = await (await pdf.getPage(n)).getTextContent();
         full += "\n" + content.items.map((x) => x.str).join(" ") + "\n";
       }
+      try { await pdf.destroy(); } catch (e) {}
       currentFileText = full.trim();
       out.textContent = currentFileText || "No se ha encontrado texto seleccionable. Puede ser un PDF escaneado.";
       if (pdf.numPages > 40) out.textContent += "\n\nSe han leído las primeras 40 páginas.";
@@ -1074,5 +1075,8 @@ $("askDoc").addEventListener("click", () => {
 $("ocrBtn").addEventListener("click", runOcr);
 
 /* ---------- arranque ---------- */
+if (navigator.deviceMemory && navigator.deviceMemory <= 4 && mode !== "cloud") {
+  mode = "cloud"; store.set("nubi-mode", mode);
+}
 updateStatus(); renderHistory(); renderMessages(); renderGallery();
 /* No precargar modelos al abrir: evita que ChromeOS cierre la pestaña por falta de RAM. */
