@@ -15,7 +15,8 @@ const WEBLLM_URL = "https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.79/+esm";
 const MODES = {
   cloud: { note: "Nube · sin API key" },
   fast: { note: "Local · ligero", base: "0.5B" },
-  smart: { note: "Local · avanzado", base: "1.5B" }
+  smart: { note: "Local · avanzado", base: "1.5B" },
+  pro: { note: "Local · potente (3B)", base: "3B" }
 };
 let mode = MODES[store.get("nubi-mode", "cloud")] ? store.get("nubi-mode", "cloud") : "cloud";
 let wikiEnabled = store.get("nubi-wiki", true);
@@ -201,7 +202,7 @@ async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTo
       if (stopRequested) return "";
       if (!navigator.gpu) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + ") y tu navegador no admite IA local. Inténtalo en unos minutos.");
       toast("La nube no responde. Usando IA local (la primera vez descarga el modelo)…");
-      return await localChat(messages, { onToken, base: "0.5B", temperature, maxTokens });
+      return await localChat(messages, { onToken, base: "1.5B", temperature, maxTokens });
     }
   }
   return localChat(messages, { onToken, base: MODES[mode].base, temperature, maxTokens });
@@ -845,7 +846,7 @@ $("clearData").addEventListener("click", () => {
 });
 $("modelSelect").addEventListener("change", (e) => {
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
-  if (mode !== "cloud") { toast("Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
+  if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
 });
 $("sendBtn").addEventListener("click", () => (busy ? stopGeneration() : sendMessage()));
 promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); } });
