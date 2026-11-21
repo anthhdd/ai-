@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  
 </head>
 <body>
   <div class="app-shell">
@@ -187,7 +187,8 @@
   <div class="modal-backdrop" id="settingsModal" hidden><div class="modal">
     <button class="modal-close" id="closeSettings" aria-label="Cerrar">×</button>
     <div class="eyebrow">PREFERENCIAS</div><h2>Configuración</h2>
-    <p><b>☁ Nube rápida:</b> respuestas muy rápidas con un modelo grande. Tus mensajes se envían al servicio gratuito Pollinations (sin clave). No envíes datos privados.<br><b>⚡🧠 Local:</b> el modelo se ejecuta en tu dispositivo (WebGPU). Privado, pero más lento y menos listo; la primera vez descarga entre 0,3 y 1 GB.</p>
+    <p><b>☁ Nube rápida:</b> respuestas sin descargar modelos grandes en tu Chromebook. Tus mensajes se envían al servicio gratuito Pollinations (sin clave). No envíes datos privados.<br><b>⚡🧠 Local:</b> descarga modelos grandes y usa memoria gráfica; puede ralentizar o bloquear dispositivos modestos. NUBI desactiva esta opción automáticamente cuando detecta poca memoria.</p>
+    <p class="hint">Consejo para Chromebook: usa ☁ Nube, cierra otras pestañas y activa «Modo SVG» para imágenes ligeras. El lector PDF solo se carga cuando abres un PDF.</p>
     <label class="setting-row"><span>Reforzar con Wikipedia (preguntas de datos)</span><input type="checkbox" id="wikiToggle"></label>
     <div class="setting-row"><span>Historial</span><strong>Solo en este dispositivo</strong></div>
     <button class="primary-button danger" id="clearData">Borrar historial y datos</button>
