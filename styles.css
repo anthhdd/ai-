@@ -176,3 +176,66 @@ button:disabled{cursor:not-allowed;opacity:.58}
 @media(prefers-reduced-motion:reduce){
  .suggestion,.primary-button,.nav-item,.gallery figure{transition:none!important}
 }
+
+
+/* NUBI 2.0 — refined visual system and video studio */
+:root{
+  --nubi-glass:rgba(20,27,42,.78);
+  --nubi-stroke:rgba(183,194,226,.16);
+  --nubi-muted:#98a6bd;
+  --nubi-lilac:#b8a7ff;
+  --nubi-cyan:#77d9df;
+}
+body{background-color:#080b13;background-image:radial-gradient(ellipse at 75% 0%,rgba(102,86,190,.14),transparent 38%),radial-gradient(ellipse at 8% 80%,rgba(57,128,151,.07),transparent 32%)}
+.app-shell{isolation:isolate}
+.sidebar{backdrop-filter:blur(22px);border-right:1px solid var(--nubi-stroke)}
+.topbar{backdrop-filter:blur(22px);box-shadow:0 1px 0 rgba(255,255,255,.025)}
+.nav-item{transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.nav-item:hover{transform:translateX(2px);background:rgba(255,255,255,.045)}
+.nav-item.active{background:linear-gradient(105deg,rgba(157,139,255,.18),rgba(89,121,167,.09));border:1px solid rgba(177,162,255,.15)}
+.tool-heading{max-width:900px;margin-inline:auto}
+.tool-heading .eyebrow{letter-spacing:2.4px;color:var(--nubi-cyan);font-weight:700}
+.tool-heading h1{line-height:1.04;text-wrap:balance}
+.tool-heading h1 span{background:linear-gradient(100deg,#c5b8ff 8%,#8fd9e4 92%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tool-heading p{max-width:650px;line-height:1.75}
+.tool-panel,.web-preview,.upload-zone{border:1px solid var(--nubi-stroke);box-shadow:0 24px 80px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.025)}
+.large-input,.composer textarea{transition:border-color .18s ease,box-shadow .18s ease}
+.opts label{min-width:0}
+.opts select{min-width:0;max-width:100%;border-color:var(--nubi-stroke);transition:border-color .18s ease,background .18s ease}
+.opts select:hover{border-color:rgba(184,167,255,.48)}
+.primary-button{font-weight:700;letter-spacing:.1px;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.primary-button:hover{box-shadow:0 12px 28px rgba(130,116,220,.28)}
+.suggestion{border:1px solid var(--nubi-stroke);background:linear-gradient(145deg,rgba(26,35,53,.9),rgba(14,21,33,.94))}
+.suggestion:focus-visible,.nav-item:focus-visible{outline-offset:3px}
+.composer{border:1px solid var(--nubi-stroke);box-shadow:0 20px 70px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.015)}
+.mic-button.recording{background:rgba(232,83,105,.18)!important;border-color:rgba(232,83,105,.65)!important;color:#ff9eae}
+.web-layout{align-items:start}
+.web-side{border:1px solid var(--nubi-stroke)}
+.web-preview{overflow:hidden}
+.video-stage{position:relative;min-height:460px;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,rgba(83,78,135,.15),transparent 55%),#080c14}
+.video-stage iframe{display:block;width:min(100%,var(--sw,100%));aspect-ratio:var(--ar,9/16);height:auto;max-height:75vh;border:0;background:#000;box-shadow:0 20px 65px #0008}
+.video-stage .web-empty{padding:30px;text-align:center}
+.video-stage .web-empty .upload-icon{background:linear-gradient(145deg,rgba(176,157,255,.2),rgba(104,215,220,.12));border:1px solid rgba(190,179,255,.22);color:#d9d1ff}
+.video-result{border-top:1px solid var(--nubi-stroke);background:rgba(11,16,26,.9)}
+.video-result video{max-height:520px;box-shadow:0 12px 35px #0006}
+#videoRecord{border:1px solid rgba(184,167,255,.22);background:rgba(166,148,255,.1);color:#ddd5ff}
+#videoRecord:disabled{opacity:.55}
+#videoGo{margin-top:20px;min-height:46px}
+#videoReviseBox{margin-top:24px;padding-top:22px;border-top:1px solid var(--nubi-stroke)}
+#videoReviseBox[hidden]{display:none}
+.web-side .hint{padding:12px 13px;border:1px solid rgba(143,169,204,.12);border-radius:12px;background:rgba(255,255,255,.025);color:var(--nubi-muted)}
+@media(max-width:1050px){
+ .video-stage{min-height:380px}
+ .video-stage iframe{max-height:68vh}
+}
+@media(max-width:760px){
+ .tool-heading h1{letter-spacing:-1.8px}
+ .video-stage{min-height:320px;padding:12px}
+ .video-stage iframe{max-height:65vh}
+ .video-result video{max-height:65vh}
+ .opts{gap:10px}
+ .opts label{flex:1 1 125px}
+}
+@media(prefers-reduced-motion:reduce){
+ .nav-item,.primary-button,.large-input,.composer textarea{transition:none!important}
+}
