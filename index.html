@@ -23,6 +23,7 @@
         <button class="nav-item" data-view="image"><span>▧</span> Crear imágenes</button>
         <button class="nav-item" data-view="web"><span>⌘</span> Webs y apps</button>
         <button class="nav-item" data-view="video"><span>▶</span> Vídeos</button>
+        <button class="nav-item" data-view="translate"><span>文</span> Traducir vídeos</button>
         <button class="nav-item" data-view="files"><span>▤</span> Archivos y PDF</button>
       </nav>
       <div class="side-label history-label">CONVERSACIONES</div>
@@ -171,6 +172,35 @@
         </div>
       </section>
 
+      <!-- TRADUCTOR DE VÍDEOS -->
+      <section class="view tool-view wide-view" id="translateView">
+        <div class="tool-heading"><div class="eyebrow">TRADUCCIÓN DE VÍDEO · GRATIS</div><h1>Entiende cada <span>vídeo.</span></h1><p>Transcribe el audio inglés, traduce los subtítulos al español y descarga un MP4 con subtítulos seleccionables.</p></div>
+        <div class="web-layout translate-layout">
+          <div class="web-side tool-panel">
+            <label class="field-label" for="translateFile">Vídeo en inglés</label>
+            <label class="translate-drop" for="translateFile"><span>＋</span><b id="translateFileName">Seleccionar vídeo</b><small>MP4 · MOV · WEBM · máximo 60 MB y 3 minutos</small></label>
+            <input type="file" id="translateFile" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" hidden>
+            <div class="translate-file-meta" id="translateMeta" hidden></div>
+            <div class="translate-steps" id="translateSteps">
+              <div data-step="load"><i>1</i><span>Cargar IA de transcripción</span><small>Modelo gratuito · se descarga una vez</small></div>
+              <div data-step="transcribe"><i>2</i><span>Escuchar y transcribir inglés</span><small>El vídeo se procesa en tu navegador</small></div>
+              <div data-step="translate"><i>3</i><span>Traducir subtítulos al español</span><small>Traducción gratuita por internet</small></div>
+              <div data-step="export"><i>4</i><span>Crear MP4 con subtítulos</span><small>El audio original se conserva</small></div>
+            </div>
+            <button class="primary-button" id="translateGo" disabled>Traducir vídeo <span>→</span></button>
+            <button class="primary-button ghost translate-cancel" id="translateCancel" hidden>Cancelar proceso</button>
+            <div class="translate-progress" id="translateProgress" hidden><div><span id="translateStatus">Preparando…</span><b id="translatePercent">0%</b></div><div class="translate-bar"><i id="translateBar"></i></div></div>
+            <p class="hint">Gratis y sin claves API. La transcripción se ejecuta en tu dispositivo; la traducción del texto usa un servicio gratuito de IA. No subimos el archivo de vídeo. Para evitar que Chrome se cierre, empieza con clips cortos.</p>
+            <p class="translate-warning">Importante: esta versión añade subtítulos en español y conserva el audio inglés. No genera todavía una voz doblada en español.</p>
+          </div>
+          <div class="web-preview translate-preview">
+            <div class="web-toolbar"><div class="tabs"><button class="tab active" type="button">Vista previa</button></div><div class="tb-right"><span class="translate-state" id="translateState">Esperando vídeo</span></div></div>
+            <div class="translate-preview-body" id="translatePreviewBody"><div class="web-empty" id="translateEmpty"><div class="upload-icon">文</div><p>Selecciona un vídeo para empezar.</p></div></div>
+            <div class="translate-download" id="translateDownload" hidden></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ARCHIVOS -->
       <section class="view tool-view" id="filesView">
         <div class="tool-heading"><div class="eyebrow">DOCUMENTOS INTELIGENTES</div><h1>Todo más <span>claro.</span></h1><p>Abre un PDF o una imagen con texto y pregúntale lo que quieras. Se procesa en tu navegador.</p></div>
@@ -195,6 +225,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <input type="file" id="hiddenFileInput" accept=".pdf,.txt,.md,image/*" hidden>
   <script src="app.js"></script>
+  <script type="module" src="translator.js"></script>
   <script defer src="search.js"></script>
 </body>
 </html>
