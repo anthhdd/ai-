@@ -259,7 +259,14 @@ async function chatWebContext(query) {
     const links = extractSearchLinks(result.text, result.kind === "YouTube");
     context += "\\n\\n" + result.kind + ":";
     if (!links.length) { context += "\\n" + result.text.slice(0, 3000); continue; }
-    for (const link of links.slice(0, 6)) context += "\\n- " + link.title + " — " + link.url;
+    const picked = links.slice(0, result.kind === "YouTube" ? 4 : 3);
+    const pages = await Promise.all(picked.map(async link => {
+      try { return await readerText(link.url, 6500); } catch (e) { return ""; }
+    }));
+    picked.forEach((link, i) => {
+      context += "\\n- " + link.title + " — " + link.url;
+      if (pages[i]) context += "\\n  Contenido recuperado: " + pages[i].replace(/\\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
+    });
   }
   context += "\\n\\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
   return context.slice(0, 8500);
