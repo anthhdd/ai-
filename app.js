@@ -317,7 +317,7 @@ function clearActiveDoc() { activeDoc = null; $("docChip").hidden = true; }
 /* ---------- chats ---------- */
 let chats = store.get("nubi-chats-v2", []);
 let currentId = null;
-function saveChats() { store.set("nubi-chats-v2", chats.slice(0, 30).map((c) => ({ ...c, messages: c.messages.filter((m) => !m.error).slice(-60).map(({ _full, ...rest }) => rest) }))); }
+function saveChats() { store.set("nubi-chats-v2", chats.slice(0, 18).map((c) => ({ ...c, messages: c.messages.filter((m) => !m.error).slice(-35).map(({ _full, ...rest }) => rest) }))); }
 function currentChat() { return chats.find((c) => c.id === currentId) || null; }
 function newChat() {
   const c = { id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), title: "Nuevo chat", messages: [], updated: Date.now() };
@@ -519,7 +519,7 @@ const IMG_STYLES = {
 };
 const IMG_SIZES = { square: [1024, 1024], wide: [1280, 720], tall: [720, 1280] };
 let gallery = store.get("nubi-gallery", []);
-function addToGallery(item) { gallery.unshift(item); store.set("nubi-gallery", gallery); renderGallery(); }
+function addToGallery(item) { gallery.unshift(item); gallery = gallery.slice(0, 8); store.set("nubi-gallery", gallery); renderGallery(); }
 function loadImage(url, timeout) {
   return new Promise((res, rej) => {
     const img = new Image();
@@ -571,19 +571,39 @@ async function ensureLocalImageModel(onProgress = () => {}) {
   try { return await localImageLoading; }
   finally { localImageLoading = null; }
 }
-function blobToDataUrl(blob) {
+async function blobToDataUrl(blob) {
+  let compact = blob;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+    compact = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error("No se pudo comprimir la imagen.")), "image/jpeg", 0.78));
+    canvas.width = 1; canvas.height = 1;
+  } catch (e) {}
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(new Error("No se pudo guardar la imagen generada."));
-    reader.readAsDataURL(blob);
+    reader.readAsDataURL(compact);
   });
+}
+async function releaseLocalTextEngine() {
+  if (!localEngine) return;
+  const old = localEngine; localEngine = null; localKey = null;
+  try { await old.unload(); } catch (e) {}
 }
 async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {} }) {
   if (svg) {
     onProgress("Creando ilustración vectorial…");
     return { url: await generateSvg(prompt), kind: "svg" };
   }
+  onProgress("Liberando memoria de la IA de texto…");
+  await releaseLocalTextEngine();
   const client = await ensureLocalImageModel(onProgress);
   const styledPrompt = prompt + (IMG_STYLES[style] || "");
   onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
@@ -704,9 +724,10 @@ function openWebCode(code) {
 function setDevice(w) { $("frameWrap").style.setProperty("--fw", w); }
 
 /* ---------- vídeos (animaciones de canvas grabadas en el navegador) ---------- */
-const VIDEO_SYSTEM = "Eres un animador de gráficos en movimiento experto en Canvas 2D. Devuelve SOLO un bloque ```js que defina function draw(ctx, t, W, H) { ... }. ctx es un CanvasRenderingContext2D de tamaño W×H; t son los segundos transcurridos (de 0 a la duración total); draw se llama unas 30 veces por segundo y debe pintar el fotograma COMPLETO cada vez (rellena el fondo primero). Sin librerías, sin DOM, sin red. No uses Math.random() dentro de draw: usa t y funciones deterministas, o genera datos una sola vez fuera de draw con un generador pseudoaleatorio con semilla. Crea una animación vistosa: escenas con transiciones suaves (easing), degradados, formas, partículas y texto con ctx.fillText en español. Escala todo con W y H. Reparte las escenas a lo largo de la duración total indicada.";
+const VIDEO_SYSTEM = "Eres un director creativo y animador experto en vídeos cortos para TikTok, YouTube Shorts, Instagram Reels y YouTube. Devuelve SOLO un bloque de código JavaScript que defina function draw(ctx, t, W, H) { ... }. Canvas 2D, sin librerías, DOM ni red. Dibuja el fotograma completo en cada llamada y escala todo con W y H. Diseña un vídeo con gancho visual en el primer segundo, escenas diferenciadas, ritmo rápido, transiciones suaves, subtítulos grandes y legibles, frases cortas en español, jerarquía tipográfica y cierre/CTA. En vertical deja márgenes seguros arriba y abajo para la interfaz de TikTok/Reels/Shorts. Evita párrafos largos y adapta escenas a la duración.";
 let videoCode = "", videoBusy = false;
 const VIDEO_DIMS = { "16:9": [1280, 720], "9:16": [720, 1280], "1:1": [1024, 1024] };
+const VIDEO_PRESETS = { social: { ratio: "9:16", duration: "15" }, youtube: { ratio: "16:9", duration: "30" }, square: { ratio: "1:1", duration: "15" } };
 function extractCode(t) {
   const m = t.match(/```(?:js|javascript)?[^\S\n]*\n?([\s\S]*?)(?:```|$)/i);
   return (m ? m[1] : t).trim();
@@ -742,7 +763,7 @@ async function buildVideo(promptText, revise) {
   if (!promptText || videoBusy) { if (!promptText) toast("Describe primero tu vídeo."); return; }
   videoBusy = true; $("videoGo").disabled = true; $("videoReviseGo").disabled = true;
   const [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"]; const dur = +$("videoDur").value || 8;
-  const spec = "Duración total: " + dur + " segundos. Lienzo: " + W + "x" + H + " (" + $("videoRatio").value + ").";
+  const spec = "Duración total: " + dur + " segundos. Lienzo: " + W + "x" + H + " (" + $("videoRatio").value + "). Destino: " + $("videoPlatform").value + ". Incluye gancho inicial, escenas, subtítulos y cierre.";
   const msgs = revise && videoCode
     ? [{ role: "system", content: VIDEO_SYSTEM }, { role: "user", content: spec + "\nEste es el código actual:\n```js\n" + videoCode.slice(0, mode === "cloud" ? 20000 : 4500) + "\n```\nAplica estos cambios y devuelve el código COMPLETO actualizado: " + promptText }]
     : [{ role: "system", content: VIDEO_SYSTEM }, { role: "user", content: spec + "\nTema: " + promptText }];
@@ -850,6 +871,7 @@ $("clearData").addEventListener("click", () => {
   ["nubi-chats-v2", "nubi-gallery"].forEach(store.del); chats = []; gallery = []; currentId = null;
   renderMessages(); renderHistory(); renderGallery(); $("settingsModal").hidden = true; toast("Datos borrados");
 });
+$("videoPlatform").addEventListener("change", (e) => { const p = VIDEO_PRESETS[e.target.value]; if (p) { $("videoRatio").value = p.ratio; $("videoDur").value = p.duration; if (videoCode) setVideoPreview(); } });
 $("modelSelect").addEventListener("change", (e) => {
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
@@ -926,7 +948,4 @@ $("ocrBtn").addEventListener("click", runOcr);
 
 /* ---------- arranque ---------- */
 updateStatus(); renderHistory(); renderMessages(); renderGallery();
-if (mode !== "cloud" && navigator.gpu) {
-  const warm = () => ensureLocal(MODES[mode].base).catch(() => {});
-  if (window.requestIdleCallback) requestIdleCallback(warm); else setTimeout(warm, 1500);
-}
+/* No precargar modelos al abrir: evita que ChromeOS cierre la pestaña por falta de RAM. */
