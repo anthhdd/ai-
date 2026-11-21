@@ -38,18 +38,48 @@ function addMessage(text, role) {
   messages.scrollTop = messages.scrollHeight;
   return bubble;
 }
-function demoReply(userText) {
-  return "¡He recibido tu mensaje!\n\nAhora mismo NUBI AI está en modo de demostración: la interfaz funciona, pero todavía no hay un modelo de inteligencia artificial conectado.\n\nTu mensaje: “" + userText + "”\n\nEl siguiente paso es conectar un backend seguro con un modelo de IA. No pongas claves API en app.js ni en ningún archivo público de GitHub.";
+// Pega aquí la URL pública de tu Cloudflare Worker después de desplegarlo.
+const NUBI_API_URL = "PEGA_AQUI_LA_URL_DE_TU_WORKER";
+
+async function askNubi(history) {
+  if (!NUBI_API_URL.startsWith("https://")) {
+    throw new Error("Falta conectar el servidor de NUBI. Sigue los pasos de README.md para publicar el Worker.");
+  }
+  const response = await fetch(NUBI_API_URL, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({messages: history.slice(-16)})
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "El servidor no pudo responder (" + response.status + ").");
+  if (!data.reply) throw new Error("El servidor ha devuelto una respuesta vacía.");
+  return data.reply;
 }
-function sendMessage(text) {
+async function sendMessage(text) {
   const value = (text || promptBox.value).trim();
   if (!value) return;
   addMessage(value, "user");
   conversation.push({role:"user",content:value});
   promptBox.value = "";
   promptBox.style.height = "auto";
-  const answer = addMessage("NUBI está preparando una respuesta…", "assistant");
-  setTimeout(() => { answer.textContent = demoReply(value); conversation.push({role:"assistant",content:answer.textContent}); saveHistory(value); }, 350);
+  const answer = addMessage("NUBI está pensando…", "assistant");
+  const send = $("sendBtn");
+  send.disabled = true;
+  send.style.opacity = ".55";
+  try {
+    const reply = await askNubi(conversation);
+    answer.textContent = reply;
+    conversation.push({role:"assistant",content:reply});
+    saveHistory(value);
+  } catch (error) {
+    answer.textContent = "No he podido conectar con mi cerebro de IA.\n\n" + error.message + "\n\nSi acabas de configurar el servidor, espera unos segundos y vuelve a intentarlo.";
+    const last = conversation[conversation.length-1];
+    if (last && last.role === "user") conversation.pop();
+  } finally {
+    send.disabled = false;
+    send.style.opacity = "1";
+    messages.scrollTop = messages.scrollHeight;
+  }
 }
 $("sendBtn").addEventListener("click", () => sendMessage());
 promptBox.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
