@@ -38,3 +38,34 @@
 .text-input{display:block;width:100%;height:38px;padding:0 12px;border-radius:9px;border:1px solid #354057;background:#0d121c;color:#fff;font:12px 'DM Sans',sans-serif;outline:none}.text-input:focus{border-color:#9a8ce7}
 .video-stage{--ar:16/9;--sw:100%;position:relative;display:grid;place-items:center;min-height:360px;padding:14px;background:#080b12}.video-stage iframe{width:var(--sw);max-width:100%;aspect-ratio:var(--ar);border:0;background:#000;border-radius:10px;box-shadow:0 12px 40px #0008}.video-stage iframe[hidden]{display:none}
 .video-result{padding:14px;border-top:1px solid #263047;display:grid;gap:10px;justify-items:start;background:#0f1522}.video-result[hidden]{display:none}.video-result video{max-width:100%;max-height:360px;border-radius:10px;background:#000}.video-result .primary-button{margin-top:0;text-decoration:none}
+
+
+/* ===== NUBI Studio polish ===== */
+:root{color-scheme:dark;--nubi-accent:#a995ff;--nubi-line:rgba(160,174,210,.13)}
+body{background:radial-gradient(ellipse at 55% -18%,rgba(105,88,190,.17),transparent 42%),#080a10}
+.app-shell{background:transparent}
+.sidebar{background:rgba(12,15,24,.94);border-right:1px solid var(--nubi-line);backdrop-filter:blur(22px)}
+.brand{letter-spacing:-.8px}.brand-mark{box-shadow:0 5px 22px #9886ff30}
+.nav-item{border:1px solid transparent;transition:background .18s,border-color .18s,transform .18s}
+.nav-item:hover{background:#ffffff08;border-color:#ffffff0c;transform:translateX(2px)}
+.nav-item.active{background:linear-gradient(100deg,#a995ff20,#7e9bff0d);border-color:#a995ff28;box-shadow:inset 2px 0 #b9aaff}
+.topbar{background:rgba(9,12,19,.72);backdrop-filter:blur(18px);border-bottom:1px solid var(--nubi-line)}
+.welcome{max-width:940px}.welcome h1{font-size:clamp(42px,6vw,68px);letter-spacing:-3px;line-height:1.04}
+.welcome h1 span,.tool-heading h1 span{background:linear-gradient(100deg,#c5b7ff 8%,#8fa9ff 55%,#78d8cf);-webkit-background-clip:text;background-clip:text;color:transparent}
+.eyebrow{letter-spacing:2px}.suggestion{border:1px solid #ffffff12;background:linear-gradient(145deg,#171d2b,#101520);border-radius:15px;transition:transform .2s,border-color .2s,box-shadow .2s}
+.suggestion:hover{transform:translateY(-3px);border-color:#a995ff66;box-shadow:0 16px 35px #0005}
+.composer{border:1px solid #59617d88;background:rgba(18,23,35,.94);box-shadow:0 15px 45px #0005,0 0 0 4px #a995ff09;backdrop-filter:blur(18px);border-radius:19px}
+.composer:focus-within{border-color:#a995ff99;box-shadow:0 15px 45px #0006,0 0 0 4px #a995ff12}
+.send-button{box-shadow:0 5px 18px #8e7be955}
+.tool-heading h1{font-size:clamp(36px,5vw,54px);letter-spacing:-2.5px}
+.tool-panel,.web-preview{border-color:#ffffff16;background:linear-gradient(145deg,rgba(24,30,45,.96),rgba(14,19,29,.96));box-shadow:0 20px 65px #0003}
+.large-input{border-color:#ffffff1c;background:#0b101a;border-radius:13px;font-size:13px;transition:border-color .18s,box-shadow .18s}
+.large-input:focus{border-color:#a995ff;box-shadow:0 0 0 4px #a995ff16}
+.primary-button{border:0;border-radius:11px;background:linear-gradient(110deg,#9b87f1,#718fe8);box-shadow:0 8px 24px #8174dc30;font-size:12px;padding:13px 19px}
+.primary-button:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 12px 28px #8174dc42}
+.gallery figure{border-color:#ffffff16;background:linear-gradient(145deg,#171d2b,#101520);transition:transform .2s,border-color .2s}
+.gallery figure:hover{transform:translateY(-3px);border-color:#a995ff66}
+.gallery img{aspect-ratio:4/3;object-fit:cover}
+.web-preview{box-shadow:0 22px 70px #0004}
+.frame-wrap{background:linear-gradient(135deg,#0b0f19,#121827)}
+@media(max-width:760px){.welcome h1{font-size:43px;letter-spacing:-2px}.tool-heading h1{font-size:37px}.tool-panel{border-radius:15px}.composer{border-radius:16px}}
