@@ -2,8 +2,7 @@
    Transcripción, traducción, síntesis de voz y exportación en el navegador. */
 const $t = (id) => document.getElementById(id);
 const fileInput = $t("translateFile");
-const selectButton = $t("translateSelectBtn");
-selectButton.addEventListener("click", () => fileInput.click());
+
 let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, synthesizer = null, outputUrl = null, previewUrl = null, translationAbort = null;
 const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
@@ -17,7 +16,7 @@ fileInput.addEventListener("change",()=>{
  if(!f)return;
  if(!/^video\//.test(f.type)&&! /\.(mp4|mov|webm)$/i.test(f.name)){alert("Selecciona un vídeo MP4, MOV o WEBM.");fileInput.value="";return;}
  if(f.size>MAX_BYTES){alert("El vídeo supera 60 MB. Usa un clip más corto o comprimido para no bloquear Chrome.");fileInput.value="";return;}
- selectedVideo=f;$t("translateFileName").textContent=f.name;$t("translateMeta").hidden=false;
+ selectedVideo=f;$t("translateFileHint").textContent=f.name;$t("translateMeta").hidden=false;
  $t("translateMeta").textContent=(f.size/1024/1024).toFixed(1)+" MB · "+f.type;
  $t("translateGo").disabled=false;$t("translateState").textContent="Vídeo listo";
  $t("translatePreviewBody").innerHTML="";const v=document.createElement("video");v.controls=true;previewUrl=URL.createObjectURL(f);v.src=previewUrl;$t("translatePreviewBody").append(v);
