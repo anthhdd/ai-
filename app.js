@@ -384,6 +384,12 @@ function messageEl(m, i, isLast) {
     const act = document.createElement("div"); act.className = "msg-actions";
     if (!m.image && !m.error) {
       const cp = document.createElement("button"); cp.textContent = "Copiar"; cp.addEventListener("click", () => { copyText(m.content); toast("Copiado"); }); act.appendChild(cp);
+      const simple = document.createElement("button"); simple.textContent = "Explicar fácil"; simple.title = "Pedir una explicación más sencilla";
+      simple.addEventListener("click", () => sendMessage("Explícame tu respuesta anterior con palabras más sencillas y un ejemplo."));
+      act.appendChild(simple);
+      const detail = document.createElement("button"); detail.textContent = "Ampliar"; detail.title = "Pedir más detalles";
+      detail.addEventListener("click", () => sendMessage("Amplía tu respuesta anterior con más detalles útiles, ejemplos y pasos prácticos."));
+      act.appendChild(detail);
     }
     if (isLast && !m.image) {
       const rg = document.createElement("button"); rg.textContent = m.error ? "Reintentar" : "Regenerar";
