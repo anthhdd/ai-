@@ -103,7 +103,7 @@ function md(src) {
 async function cloudChat(messages, { onToken, temperature = 0.7 }) {
   const ctrl = new AbortController();
   currentAbort = ctrl;
-  const timer = setTimeout(() => ctrl.abort(), 25000);
+  const timer = setTimeout(() => ctrl.abort(), 60000);
   let full = "";
   try {
     const res = await fetch(CLOUD_URL, {
@@ -291,7 +291,7 @@ function systemPrompt(extra) {
 }
 function toModelMessages(msgs) {
   const list = msgs.filter((m) => !m.error).slice(-8);
-  let imgBudget = 2; const out = [];
+  let imgBudget = 8; const out = [];
   for (let i = list.length - 1; i >= 0; i--) {
     const m = list[i];
     let content = m.image ? "[Imagen generada: " + m.image.prompt + "]" : m.content;
@@ -412,7 +412,7 @@ function fileToImage(file) {
   });
 }
 async function addPendingImage(file) {
-  if (pendingImages.length >= 3) { toast("Máximo 3 imágenes por mensaje."); return; }
+  if (pendingImages.length >= 20) { toast("Has alcanzado el máximo técnico de 20 imágenes por mensaje."); return; }
   try { pendingImages.push(await fileToImage(file)); renderStrip(); if (mode !== "cloud") toast("Para que NUBI vea la imagen cambia al modo ☁ Nube rápida."); }
   catch (e) { toast(e.message || "No se pudo añadir la imagen."); }
 }
@@ -454,7 +454,7 @@ const IMG_STYLES = {
 };
 const IMG_SIZES = { square: [1024, 1024], wide: [1280, 720], tall: [720, 1280] };
 let gallery = store.get("nubi-gallery", []);
-function addToGallery(item) { gallery.unshift(item); gallery = gallery.slice(0, 12); store.set("nubi-gallery", gallery); renderGallery(); }
+function addToGallery(item) { gallery.unshift(item); gallery = gallery.slice(0, 100); store.set("nubi-gallery", gallery); renderGallery(); }
 function loadImage(url, timeout) {
   return new Promise((res, rej) => {
     const img = new Image();
