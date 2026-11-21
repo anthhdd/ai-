@@ -178,8 +178,8 @@
         <div class="web-layout translate-layout">
           <div class="web-side tool-panel">
             <label class="field-label" for="translateFile">Vídeo en inglés</label>
-            <button type="button" class="translate-drop" id="translateSelectBtn"><span>＋</span><b id="translateFileName">Seleccionar vídeo</b><small>MP4 · MOV · WEBM · máximo 60 MB y 3 minutos</small></button>
-            <input type="file" id="translateFile" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" hidden>
+            <input type="file" id="translateFile" class="translate-file-input" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm">
+            <small class="translate-file-hint" id="translateFileHint">MP4 · MOV · WEBM · máximo 60 MB y 3 minutos</small>
             <div class="translate-file-meta" id="translateMeta" hidden></div>
             <div class="translate-steps" id="translateSteps">
               <div data-step="load"><i>1</i><span>Cargar IA de transcripción</span><small>Modelo gratuito · se descarga una vez</small></div>
