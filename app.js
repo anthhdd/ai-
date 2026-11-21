@@ -478,14 +478,34 @@ async function makeImage({ prompt, style, size, seed, svg }) {
   if (!svg) {
     const [w, h] = IMG_SIZES[size] || IMG_SIZES.square;
     const full = encodeURIComponent(prompt + (IMG_STYLES[style] || ""));
-    const qs = "?width=" + w + "&height=" + h + "&seed=" + seed + "&nologo=true&model=flux";
     const key = store.get("nubi-pkey", "");
-    if (key) { try { return { url: await loadImage("https://gen.pollinations.ai/image/" + full + qs + "&key=" + encodeURIComponent(key), 60000), kind: "ai" }; } catch (e) { toast("La clave de Pollinations no funcionó; uso el modo gratuito."); } }
-    try { return { url: await loadImage("https://image.pollinations.ai/prompt/" + full + qs, 60000), kind: "ai" }; } catch (e) {}
-    try { return { url: await loadImage("https://pollinations.ai/p/" + full + qs, 45000), kind: "ai" }; } catch (e) {}
-    toast("El servicio de imágenes no responde. Dibujo un SVG con la IA.");
+    const attempts = [];
+    // API actual de Pollinations (requiere clave); se conserva el endpoint gratuito legado como alternativa.
+    if (key) attempts.push("https://gen.pollinations.ai/image/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&model=black-forest-labs/flux.1-schnell&key=" + encodeURIComponent(key));
+    attempts.push("https://image.pollinations.ai/prompt/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&nologo=true&model=flux");
+    attempts.push("https://pollinations.ai/p/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&nologo=true&model=flux");
+    let lastError = null;
+    for (const url of attempts) {
+      try { return { url: await loadImage(url, 60000), kind: "ai" }; }
+      catch (e) { lastError = e; }
+    }
+    toast("Pollinations ha limitado o rechazado la imagen. Probando un dibujo alternativo…");
+    try { return { url: await generateSvg(prompt), kind: "svg" }; }
+    catch (e) {
+      const fallback = makePromptSvg(prompt);
+      if (fallback) return { url: fallback, kind: "svg" };
+      throw new Error("El servicio de imágenes ha alcanzado su límite gratuito (puede tardar unos 45 segundos en permitir otra imagen). " + (lastError ? lastError.message : "") + " Prueba de nuevo más tarde o añade tu clave en Configuración.");
+    }
   }
-  return { url: await generateSvg(prompt), kind: "svg" };
+  try { return { url: await generateSvg(prompt), kind: "svg" }; }
+  catch (e) { return { url: makePromptSvg(prompt), kind: "svg" }; }
+}
+function makePromptSvg(prompt) {
+  const safe = esc(prompt.slice(0, 140));
+  const palettes = [["#7c3aed","#06b6d4","#f472b6"],["#0f766e","#84cc16","#facc15"],["#1d4ed8","#a78bfa","#fb7185"]];
+  const p = palettes[Math.abs([...prompt].reduce((n,c)=>n+c.charCodeAt(0),0)) % palettes.length];
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="'+p[0]+'"/><stop offset="1" stop-color="'+p[1]+'"/></linearGradient><radialGradient id="r"><stop stop-color="'+p[2]+'" stop-opacity=".9"/><stop offset="1" stop-color="'+p[2]+'" stop-opacity="0"/></radialGradient><filter id="b"><feGaussianBlur stdDeviation="45"/></filter></defs><rect width="1024" height="1024" fill="#090d1b"/><circle cx="230" cy="260" r="290" fill="url(#r)" filter="url(#b)"/><circle cx="790" cy="760" r="340" fill="url(#r)" filter="url(#b)"/><path d="M0 720 Q260 520 510 720 T1024 690 V1024 H0Z" fill="url(#g)" opacity=".72"/><circle cx="512" cy="420" r="180" fill="url(#g)" stroke="#fff" stroke-opacity=".45" stroke-width="5"/><path d="M370 420 Q512 250 654 420 Q512 590 370 420Z" fill="#fff" fill-opacity=".18"/><text x="512" y="870" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="32" font-weight="700">'+safe+'</text><text x="512" y="920" text-anchor="middle" fill="#fff" fill-opacity=".65" font-family="Arial,sans-serif" font-size="18">NUBI · CREACIÓN VECTORIAL DE RESPALDO</text></svg>';
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 async function downloadUrl(url, name) {
   try {
@@ -529,7 +549,7 @@ async function generateImageUI() {
 }
 
 /* ---------- constructor de webs ---------- */
-const WEB_SYSTEM = "Eres un diseñador y desarrollador web experto. Devuelve SIEMPRE un único archivo HTML completo (<!DOCTYPE html>…) con el CSS en <style> y el JavaScript en <script>, sin dependencias externas (salvo Google Fonts opcional). Diseño moderno, responsive, accesible y cuidado: buena tipografía, espaciado, colores armoniosos, sombras y transiciones suaves. Usa contenido real y creíble en español (nada de lorem ipsum) y haz que las interacciones funcionen de verdad. Para imágenes usa gradientes, SVG o emojis (no enlaces externos). Responde SOLO con un bloque ```html, sin explicaciones.";
+const WEB_SYSTEM = "Eres NUBI Studio, un equipo senior de diseño de producto, UX/UI y desarrollo frontend. Construye sitios web de nivel profesional, no plantillas genéricas. Devuelve SIEMPRE un único documento HTML completo y ejecutable, empezando por <!DOCTYPE html>, con CSS dentro de <style> y JS dentro de <script>; sin frameworks, dependencias obligatorias ni archivos separados. Antes de escribir, define mentalmente el objetivo, público, jerarquía visual y flujo de uso. DISEÑO: crea una identidad visual coherente y distintiva; usa una paleta limitada, tipografía con personalidad, escala de espaciado consistente, grid/alineación precisos, contraste alto, fondos y superficies con profundidad sutil, estados hover/focus y microinteracciones discretas. Evita el aspecto de plantilla IA, los gradientes aleatorios, exceso de tarjetas y emojis como iconos. Usa iconos SVG inline. CONTENIDO: español natural, textos específicos y creíbles, títulos con personalidad, llamadas a la acción claras y datos de ejemplo coherentes; nunca lorem ipsum. ESTRUCTURA: cabecera/nav, hero bien compuesto, secciones relevantes, detalles visuales, CTA y footer según el proyecto; no fuerces secciones que no tengan sentido. FUNCIONALIDAD: todo botón, menú, búsqueda, filtro, formulario, modal, pestaña, carrito o control visible debe funcionar; valida formularios, muestra estados vacíos/carga/éxito/error, persiste preferencias/datos con localStorage cuando tenga sentido y añade controles táctiles y teclado. Para juegos, crea un juego realmente jugable con bucle, colisiones, puntuación, reinicio y controles móvil/PC. CALIDAD: responsive mobile-first, accesible (labels, landmarks, aria cuando proceda, foco visible, reduced motion), semántico, rendimiento razonable, sin errores de consola, sin XSS, sin enlaces falsos (#) ni botones decorativos. No inventes servicios backend: si una función necesita servidor, crea una demo local honesta. Usa imágenes solo con SVG/CSS o URLs públicas fiables; no dependas de imágenes rotas. Devuelve código completo, no fragmentos. Responde SOLO con un bloque ```html.";
 let webCode = "", webBusy = false, webRef = null;
 function extractHtml(t) {
   const m = t.match(/```(?:html)?[^\S\n]*\n?([\s\S]*?)(?:```|$)/i);
@@ -565,7 +585,7 @@ async function buildWeb(promptText, revise) {
   if (!revise) { webCode = ""; $("webFrame").hidden = true; $("webEmpty").hidden = false; $("webEmpty").innerHTML = '<span class="typing"><i></i><i></i><i></i></span><p>Escribiendo tu web…</p>'; }
   try {
     const out = await generate(msgs, {
-      temperature: 0.6, maxTokens: 4000,
+      temperature: 0.55, maxTokens: mode === "cloud" ? 6500 : 4000,
       onToken: (t) => {
         const code = extractHtml(t); $("webCodeView").textContent = code;
         const now = Date.now();
