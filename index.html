@@ -23,6 +23,7 @@
         <button class="nav-item" data-view="image"><span>▧</span> Crear imágenes</button>
         <button class="nav-item" data-view="web"><span>⌘</span> Webs y apps</button>
         <button class="nav-item" data-view="video"><span>▶</span> Vídeos</button>
+        <button class="nav-item" data-view="clips"><span>✂</span> Clips virales</button>
         <button class="nav-item" data-view="files"><span>▤</span> Archivos y PDF</button>
       </nav>
       <div class="side-label history-label">CONVERSACIONES</div>
@@ -167,6 +168,45 @@
               <iframe id="videoFrame" title="Vista previa de la animación" sandbox="allow-scripts" hidden></iframe>
             </div>
             <div class="video-result" id="videoResult" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLIPS -->
+      <section class="view tool-view wide-view" id="clipsView">
+        <div class="tool-heading"><div class="eyebrow">NUBI CLIP STUDIO</div><h1>Encuentra el <span>momento.</span></h1><p>Convierte tus vídeos en clips verticales con zoom, subtítulos y descarga para Shorts, TikTok y Reels.</p></div>
+        <div class="web-layout clips-layout">
+          <div class="web-side tool-panel">
+            <label class="field-label" for="clipFile">1. Sube tu vídeo</label>
+            <label class="clip-upload" for="clipFile"><span>＋</span><b id="clipFileLabel">Seleccionar vídeo</b><small>MP4, WebM o MOV · desde tu dispositivo</small></label>
+            <input type="file" id="clipFile" accept="video/*" hidden>
+            <label class="field-label" for="clipSourceUrl">¿Viene de YouTube o Kick?</label>
+            <input class="large-input clip-url" id="clipSourceUrl" type="url" placeholder="Pega aquí el enlace original (opcional)">
+            <p class="hint">El enlace sirve para identificar el origen. Para editar y descargar, sube el archivo de vídeo que tengas derecho a reutilizar. NUBI no descarga ni extrae vídeos de YouTube/Kick.</p>
+            <label class="field-label" for="clipTranscript">2. Busca el momento más interesante</label>
+            <textarea class="large-input" id="clipTranscript" placeholder="Pega la transcripción con tiempos, por ejemplo:&#10;00:12 — No me puedo creer lo que acaba de pasar...&#10;00:38 — ¡Mira eso!"></textarea>
+            <button class="primary-button" id="clipAnalyze">✦ Encontrar momento viral</button>
+            <div class="clip-analysis" id="clipAnalysis" hidden></div>
+            <div class="clip-divider"></div>
+            <label class="field-label">3. Ajusta el clip</label>
+            <div class="opts clip-times">
+              <label>Inicio (segundos)<input class="large-input" id="clipStart" type="number" min="0" step="0.1" value="0"></label>
+              <label>Final (segundos)<input class="large-input" id="clipEnd" type="number" min="1" step="0.1" value="20"></label>
+            </div>
+            <label class="field-label" for="clipCaption">Subtítulo / gancho</label>
+            <textarea class="large-input small" id="clipCaption" placeholder="Escribe el texto que aparecerá en pantalla..."></textarea>
+            <div class="opts">
+              <label>Estilo<select id="clipStyle"><option value="bold">Impactante</option><option value="clean">Minimalista</option><option value="neon">Neón</option></select></label>
+              <label>Zoom<select id="clipZoom"><option value="1">Sin zoom</option><option value="1.12" selected>Suave</option><option value="1.28">Cercano</option><option value="1.45">Dinámico</option></select></label>
+            </div>
+            <button class="primary-button" id="clipExport" disabled>↧ Crear y descargar Short</button>
+            <p class="hint">La IA recomienda el fragmento a partir de la transcripción que pegues. El recorte, el formato vertical y los subtítulos se procesan en tu navegador; no se sube el vídeo.</p>
+          </div>
+          <div class="web-preview clip-preview">
+            <div class="web-toolbar"><div class="tabs"><button class="tab active" type="button">Vista previa 9:16</button></div><div class="tb-right"><span class="clip-duration" id="clipDuration">Sin vídeo</span></div></div>
+            <div class="clip-stage" id="clipStage"><div class="web-empty"><div class="upload-icon">✂</div><p>Sube un vídeo para empezar a editar.</p></div><video id="clipVideo" playsinline muted hidden></video><canvas id="clipCanvas" width="360" height="640" hidden></canvas></div>
+            <div class="clip-progress" id="clipProgress" hidden><span id="clipProgressText">Preparando clip…</span><progress id="clipProgressBar" max="100" value="0"></progress></div>
+            <div class="clip-result" id="clipResult" hidden></div>
           </div>
         </div>
       </section>
