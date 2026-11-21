@@ -71,3 +71,67 @@ body{background:radial-gradient(ellipse at 55% -18%,rgba(105,88,190,.17),transpa
 @media(max-width:760px){.welcome h1{font-size:43px;letter-spacing:-2px}.tool-heading h1{font-size:37px}.tool-panel{border-radius:15px}.composer{border-radius:16px}}
 
 .mic-button{width:31px;height:31px;border:1px solid #354057;background:#1c2433;color:#c2b5ff;border-radius:9px;font-size:15px;cursor:pointer;transition:.2s}.mic-button:hover{background:#302a4b}.mic-button.recording{background:#6b293c;border-color:#e87991;color:#fff;animation:micPulse 1.2s infinite}@keyframes micPulse{50%{box-shadow:0 0 0 5px #e8799130}}
+
+/* NUBI UI refresh — visual system */
+:root{--bg:#090b12;--sidebar:#0b0e17;--surface:#121827;--surface2:#192235;--line:#28334a;--text:#f4f6fc;--muted:#9aa6bb;--purple:#b6a5ff;--blue:#8ea8ff;--mint:#86e5d4}
+body{background:radial-gradient(ellipse at 78% -12%,#30275b55 0,transparent 34%),radial-gradient(ellipse at 15% 95%,#1b526022 0,transparent 35%),var(--bg);letter-spacing:.005em}
+.sidebar{background:rgba(10,13,22,.96);border-right:1px solid #ffffff0c;padding:25px 17px 16px}
+.brand{font-size:22px;padding-bottom:31px;letter-spacing:-1px}
+.brand-mark{width:38px;height:38px;border-radius:13px;background:linear-gradient(145deg,#d0c1ff,#8179ed 60%,#5ac8c2);box-shadow:0 8px 28px #9181ff44}
+.new-chat{height:47px;border-radius:13px;background:linear-gradient(110deg,#282443,#1a2638);border-color:#7164a955;box-shadow:inset 0 1px #ffffff10}
+.side-label{font-size:9px;letter-spacing:1.8px;color:#78849c}
+.nav{gap:6px}.nav-item{padding:12px 12px;border-radius:11px;font-size:12px;color:#aab4c7}
+.nav-item span{font-size:17px;width:28px}.nav-item.active{background:linear-gradient(100deg,#30294caa,#1b2638);border-color:#9b8be52b;box-shadow:inset 3px 0 #b8a8ff;color:#fff}
+.history-entry{padding:11px 8px;border-radius:8px;border:0}.history-entry:hover{background:#ffffff08}
+.user-card{border-color:#ffffff12;background:linear-gradient(145deg,#171e2d,#101621);border-radius:14px;padding:12px}
+.topbar{height:70px;padding:0 36px;background:#0a0d16bb;border-color:#ffffff0d}
+.breadcrumb{font-size:12px}.top-actions{gap:11px}
+.model-select{border:1px solid #ffffff17!important;background:#151c2b!important;border-radius:10px!important;min-height:36px!important;color:#dce3f2!important;padding:0 11px!important}
+.icon-button,.mobile-menu{border-color:#ffffff18;background:#151c2b;color:#c9d2e3;border-radius:11px}
+.welcome{width:min(850px,calc(100% - 52px));padding-top:clamp(35px,7vh,82px);margin-bottom:25px}
+.eyebrow{font-size:10px;letter-spacing:2.1px;color:#bcaeff}
+.welcome h1{font-size:clamp(43px,6vw,70px);letter-spacing:-3.8px;line-height:1.02;margin:22px 0 18px}
+.welcome h1 span,.tool-heading h1 span{background:linear-gradient(100deg,#c8b8ff 0%,#91a7ff 52%,#83e6d4 100%);-webkit-background-clip:text;background-clip:text}
+.welcome-copy{font-size:14px;max-width:570px;color:#aab5c8;line-height:1.8}
+.suggestions{gap:13px;margin-top:36px}
+.suggestion{min-height:132px;padding:19px;border-radius:17px;border-color:#ffffff12;background:linear-gradient(145deg,#171e2eec,#101725f2);box-shadow:0 10px 30px #00000012;transition:transform .2s,border-color .2s,background .2s}
+.suggestion:after{width:120px;height:120px;background:#a99aff16}
+.suggestion:hover{transform:translateY(-4px);border-color:#a99aff77;background:linear-gradient(145deg,#22243b,#152333)}
+.suggestion span{font-size:21px;color:#c3b4ff;margin-bottom:17px}
+.suggestion b{font-size:13px}.suggestion small{font-size:11px;line-height:1.6;color:#9aa7bd}
+.composer-wrap{width:min(850px,calc(100% - 52px));margin-bottom:23px}
+.composer{padding:15px 16px 12px;border-radius:20px;border-color:#6d739055;background:linear-gradient(145deg,#1a2232f5,#111824f7);box-shadow:0 18px 65px #0006,0 0 0 5px #a995ff08;backdrop-filter:blur(20px)}
+.composer:focus-within{border-color:#a995ffb0;box-shadow:0 18px 65px #0007,0 0 0 5px #a995ff12}
+.composer textarea{font-size:14px;line-height:1.75;min-height:43px;padding:5px 6px}
+.composer textarea::placeholder{color:#8794aa}
+.composer-tools{gap:8px;font-size:10px}.composer-tools button,.mic-button{width:34px;height:34px;border-radius:11px;border-color:#ffffff1c;background:#202a3b}
+.send-button{width:39px;height:39px;border-radius:12px;font-size:23px;background:linear-gradient(140deg,#c2b2ff,#8199f2 65%,#67cfc7);box-shadow:0 7px 20px #8274dc55}
+.disclaimer{font-size:10px;color:#8390a7;line-height:1.6;margin-top:12px}
+.messages{width:min(850px,calc(100% - 52px));max-height:calc(100vh - 205px);padding:5px 2px}
+.message{gap:13px;margin:23px 0}
+.message-avatar{width:34px;height:34px;border-radius:12px;background:linear-gradient(145deg,#7669bd,#344d70);box-shadow:0 5px 18px #7565b533}
+.message-bubble{padding:15px 18px;border-radius:17px;border-color:#ffffff12;background:linear-gradient(145deg,#171f2f,#121a28);font-size:13.5px;line-height:1.8}
+.message.user .message-bubble{background:linear-gradient(135deg,#302a4d,#202c42);border-color:#a99aff30}
+.msg-actions button{border-radius:8px;padding:6px 9px;color:#aab6cc}.msg-actions button:hover{background:#ffffff0b;color:#e8eaff}
+.tool-view{padding-top:55px}.tool-heading h1{font-size:clamp(39px,5vw,57px);letter-spacing:-2.8px}
+.tool-heading p{font-size:13px;color:#aab5c8}
+.tool-panel,.upload-zone,.web-preview{border-color:#ffffff13;border-radius:19px;background:linear-gradient(145deg,#171f2f,#111824);box-shadow:0 18px 55px #0003}
+.tool-panel{padding:28px}.large-input{border-radius:13px;border-color:#ffffff19;background:#0d1420;font-size:13px;padding:15px}
+.large-input:focus{border-color:#a995ff;box-shadow:0 0 0 4px #a995ff14}
+.field-label{font-size:12px;color:#d4dced}.primary-button{border:0;border-radius:12px;padding:13px 18px;background:linear-gradient(110deg,#a995f5,#758ee9);box-shadow:0 8px 22px #8274dc30;font-size:12px}
+.primary-button:hover{filter:brightness(1.12);transform:translateY(-2px)}
+.chips button,.opts select,.opts label select,.mini,.tab{border-radius:9px}
+.web-toolbar{border-color:#ffffff12;background:#141c2a;border-radius:14px 14px 0 0}
+.frame-wrap,.video-stage{border-color:#ffffff12;background:#0d131e;border-radius:0 0 14px 14px}
+.upload-zone{padding:58px 22px}.upload-zone h2{font-size:21px}
+.modal{border-color:#ffffff1c;border-radius:20px;background:linear-gradient(145deg,#1c2537,#101722)}
+.toast{border:1px solid #ffffff20;border-radius:12px;background:#1a2435;box-shadow:0 12px 35px #0006}
+:focus-visible{outline:2px solid #b6a5ff!important;outline-offset:3px}
+@media(max-width:760px){
+ .sidebar{background:#0b0f19f7}.topbar{height:62px;padding:0 13px}.breadcrumb{font-size:10px}.top-actions{gap:6px}.model-select{max-width:124px!important;font-size:10px!important}
+ .welcome{width:calc(100% - 34px);padding-top:34px}.welcome h1{font-size:clamp(39px,11vw,54px);letter-spacing:-2.5px}.welcome-copy{font-size:12px}
+ .suggestions{gap:9px;margin-top:25px}.suggestion{min-height:91px;padding:14px;border-radius:14px}.suggestion span{font-size:18px;margin-bottom:9px}
+ .composer-wrap,.messages{width:calc(100% - 24px)}.composer{padding:12px;border-radius:16px}.composer textarea{font-size:13px}.composer-tools span{font-size:9px}
+ .tool-view{width:calc(100% - 26px);padding-top:35px}.tool-panel{padding:18px}.tool-heading h1{font-size:38px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
