@@ -69,3 +69,5 @@ body{background:radial-gradient(ellipse at 55% -18%,rgba(105,88,190,.17),transpa
 .web-preview{box-shadow:0 22px 70px #0004}
 .frame-wrap{background:linear-gradient(135deg,#0b0f19,#121827)}
 @media(max-width:760px){.welcome h1{font-size:43px;letter-spacing:-2px}.tool-heading h1{font-size:37px}.tool-panel{border-radius:15px}.composer{border-radius:16px}}
+
+.mic-button{width:31px;height:31px;border:1px solid #354057;background:#1c2433;color:#c2b5ff;border-radius:9px;font-size:15px;cursor:pointer;transition:.2s}.mic-button:hover{background:#302a4b}.mic-button.recording{background:#6b293c;border-color:#e87991;color:#fff;animation:micPulse 1.2s infinite}@keyframes micPulse{50%{box-shadow:0 0 0 5px #e8799130}}
