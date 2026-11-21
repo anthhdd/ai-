@@ -814,6 +814,19 @@ window.addEventListener("message", (e) => {
 });
 
 /* ---------- archivos ---------- */
+let pdfJsLoading = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfJsLoading) return pdfJsLoading;
+  pdfJsLoading = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.onload = () => window.pdfjsLib ? resolve(window.pdfjsLib) : reject(new Error("PDF.js no disponible"));
+    script.onerror = () => reject(new Error("No se pudo descargar PDF.js"));
+    document.head.appendChild(script);
+  }).finally(() => { pdfJsLoading = null; });
+  return pdfJsLoading;
+}
 let currentFileUrl = null, currentFile = null, currentFileText = "";
 async function processFile(file) {
   currentFile = file; currentFileText = "";
@@ -829,7 +842,11 @@ async function processFile(file) {
     $("ocrBtn").hidden = false; return;
   }
   if (file.type === "application/pdf" || name.endsWith(".pdf")) {
-    if (!window.pdfjsLib) { out.textContent = "No se pudo cargar el lector PDF. Comprueba tu conexión y vuelve a intentarlo."; return; }
+    try {
+      await loadPdfJs();
+    } catch (e) {
+      out.textContent = "No se pudo cargar el lector PDF. Comprueba tu conexión y vuelve a intentarlo."; return;
+    }
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     try {
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -869,7 +886,13 @@ async function runOcr() {
 function setView(name) {
   const previous = document.querySelector(".view.active-view");
   const previousName = previous ? previous.id.replace(/View$/, "") : "";
-  if (previousName === "video" && name !== "video") { $("videoFrame").srcdoc = ""; $("videoFrame").hidden = true; }
+  if (previousName === "video" && name !== "video") {
+    const previewVideo = $("videoResult").querySelector("video");
+    if (previewVideo) previewVideo.pause();
+    $("videoFrame").srcdoc = ""; $("videoFrame").hidden = true;
+    $("videoRecord").textContent = "⏺ Grabar y descargar";
+    $("videoRecord").disabled = !videoCode;
+  }
   if (previousName === "web" && name !== "web") { $("webFrame").srcdoc = ""; $("webFrame").hidden = true; }
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
