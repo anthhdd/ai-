@@ -146,7 +146,8 @@ async function cloudChat(messages, { onToken, temperature = 0.7 }) {
 
 let localEngine = null, localKey = null, localLoading = null;
 async function ensureLocal(base) {
-  if (!navigator.gpu) throw new Error("Tu navegador no admite WebGPU (necesario para la IA local). Usa Chrome o Edge actualizados, o el modo ☁ Nube.");
+  if (!navigator.gpu) throw new Error("Tu navegador no admite WebGPU (necesario para la IA local). Usa el modo ☁ Nube.");
+  if (navigator.deviceMemory && navigator.deviceMemory <= 4) throw new Error("Este Chromebook tiene poca memoria disponible para ejecutar modelos locales. Usa ☁ Nube para evitar que Chrome se bloquee.");
   if (localEngine && localKey === base) return localEngine;
   if (localLoading && localLoading.key === base) return localLoading.p;
   const p = (async () => {
@@ -200,7 +201,7 @@ async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTo
     try { return await cloudChat(messages, { onToken, temperature }); }
     catch (err) {
       if (stopRequested) return "";
-      if (!navigator.gpu) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + ") y tu navegador no admite IA local. Inténtalo en unos minutos.");
+      if (!navigator.gpu || (navigator.deviceMemory && navigator.deviceMemory <= 4)) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + "). No iniciaré un modelo local porque podría agotar la memoria de este Chromebook. Inténtalo en unos minutos.");
       toast("La nube no responde. Usando IA local (la primera vez descarga el modelo)…");
       return await localChat(messages, { onToken, base: "0.5B", temperature, maxTokens });
     }
@@ -552,7 +553,8 @@ async function generateSvg(prompt) {
 }
 let localImageModule = null, localImageLoading = null, localImageReady = false;
 async function ensureLocalImageModel(onProgress = () => {}) {
-  if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
+  if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. No se ha enviado tu prompt a ningún servicio.");
+  if (navigator.deviceMemory && navigator.deviceMemory <= 4) throw new Error("La generación local de imágenes necesita demasiada memoria para este Chromebook. Activa «Modo SVG» para crear una ilustración ligera sin cargar SD-Turbo.");
   if (localImageModule && localImageReady) return localImageModule;
   if (localImageLoading) return localImageLoading;
   localImageLoading = (async () => {
@@ -751,18 +753,22 @@ function videoHarness(code, W, H, dur) {
   'if(!draw)err("La animación no definió la función draw.");' +
   'let rec=false,start=performance.now(),mr=null,chunks=[],n=0;' +
   'function frame(now){let t=(now-start)/1000;if(rec){if(t>=DUR){rec=false;try{mr.stop();}catch(e){}t=DUR;}}else t=t%DUR;' +
+  'if(document.hidden){requestAnimationFrame(frame);return;}' +
   'if(draw){try{ctx.save();ctx.clearRect(0,0,W,H);draw(ctx,t,W,H);ctx.restore();}catch(e){err(e);}}' +
   'if(rec&&(n++%8===0))parent.postMessage({type:"nubi-progress",p:Math.min(1,t/DUR)},"*");requestAnimationFrame(frame);}' +
   'function startRec(){if(rec)return;const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];' +
   'const mt=window.MediaRecorder&&types.find(x=>MediaRecorder.isTypeSupported(x));if(!mt){err("Tu navegador no puede grabar vídeo. Usa Chrome, Edge o Firefox.");return;}' +
-  'mr=new MediaRecorder(cv.captureStream(24),{mimeType:mt,videoBitsPerSecond:3500000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
+  'mr=new MediaRecorder(cv.captureStream(20),{mimeType:mt,videoBitsPerSecond:1200000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
   'mr.onstop=()=>{parent.postMessage({type:"nubi-video",blob:new Blob(chunks,{type:mt.split(";")[0]})},"*");};mr.start(250);start=performance.now();rec=true;}' +
   'addEventListener("message",e=>{if(e.data&&e.data.cmd==="record")startRec();});requestAnimationFrame(frame);' +
   '<\/script></body></html>';
 }
 function setVideoPreview() {
-  const [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"];
+  let [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"];
   const dur = +$("videoDur").value || 8;
+  const memory = navigator.deviceMemory || 8;
+  const scale = memory <= 4 ? 0.5 : memory <= 8 ? 0.65 : 0.8;
+  W = Math.round(W * scale); H = Math.round(H * scale);
   $("videoStage").style.setProperty("--ar", W + "/" + H);
   $("videoStage").style.setProperty("--sw", "min(100%," + Math.round(68 * W / H) + "vh)");
   $("videoFrame").srcdoc = videoHarness(videoCode, W, H, dur);
@@ -861,8 +867,14 @@ async function runOcr() {
 
 /* ---------- navegación y eventos ---------- */
 function setView(name) {
+  const previous = document.querySelector(".view.active-view");
+  const previousName = previous ? previous.id.replace(/View$/, "") : "";
+  if (previousName === "video" && name !== "video") { $("videoFrame").srcdoc = ""; $("videoFrame").hidden = true; }
+  if (previousName === "web" && name !== "web") { $("webFrame").srcdoc = ""; $("webFrame").hidden = true; }
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
+  if (name === "video" && videoCode && !$("videoFrame").srcdoc) setVideoPreview();
+  if (name === "web" && webCode && !$("webFrame").srcdoc) setPreview(webCode);
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", files: "Archivos y PDF" }[name] || "Chat";
   $("sidebar").classList.remove("open");
@@ -883,6 +895,10 @@ $("clearData").addEventListener("click", () => {
 });
 $("videoPlatform").addEventListener("change", (e) => { const p = VIDEO_PRESETS[e.target.value]; if (p) { $("videoRatio").value = p.ratio; $("videoDur").value = p.duration; if (videoCode) setVideoPreview(); } });
 $("modelSelect").addEventListener("change", (e) => {
+  if (e.target.value !== "cloud" && navigator.deviceMemory && navigator.deviceMemory <= 4) {
+    e.target.value = "cloud"; mode = "cloud"; store.set("nubi-mode", mode); updateStatus();
+    toast("En este Chromebook es mejor usar ☁ Nube: los modelos locales pueden agotar la memoria."); return;
+  }
   if (e.target.value === "cloud") releaseLocalTextEngine();
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
