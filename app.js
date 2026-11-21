@@ -1,7 +1,7 @@
 "use strict";
 /* NUBI AI — chat, imágenes y webs sin API key.
-   Texto: nube gratuita (Pollinations) o IA local en el navegador (WebLLM + WebGPU).
-   Imágenes: Pollinations (sin clave) o dibujo SVG hecho por la propia IA.        */
+   Texto: nube gratuita o IA local en el navegador.
+   Imágenes: modelo SD-Turbo ejecutado localmente con WebGPU; sin servicio externo de generación. */
 
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -540,7 +540,7 @@ async function ensureLocalImageModel(onProgress = () => {}) {
   if (localImageLoading) return localImageLoading;
   localImageLoading = (async () => {
     onProgress("Preparando el motor de imágenes local…");
-    const mod = await import("https://esm.sh/web-txt2img@0.2.0");
+    const mod = await import("https://esm.sh/web-txt2img@latest");
     const Client = mod.Txt2ImgWorkerClient || mod.default?.Txt2ImgWorkerClient;
     if (!Client) throw new Error("No se pudo cargar el motor local de imágenes.");
     const client = Client.createDefault();
