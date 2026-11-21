@@ -7,7 +7,7 @@ const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
 const setStatus = (s) => { $t("translateStatus").textContent=s; $t("translateState").textContent=s; };
 const setProgress = (p,s) => { $t("translateProgress").hidden=false; $t("translatePercent").textContent=Math.round(p)+"%"; $t("translateBar").style.width=Math.max(0,Math.min(100,p))+"%"; if(s)setStatus(s); };
-function step(name){document.querySelectorAll("#translateSteps [data-step]").forEach(el=>{el.classList.toggle("active",el.dataset.step===name);if(["load","transcribe","translate","voice","export"].indexOf(el.dataset.step)<["load","transcribe","translate","voice","export"].indexOf(name))el.classList.add("done");});}
+function step(name){const order=["load","transcribe","translate","voice","export"];document.querySelectorAll("#translateSteps [data-step]").forEach(el=>{el.classList.toggle("active",el.dataset.step===name);if(name==="complete"||order.indexOf(el.dataset.step)<order.indexOf(name))el.classList.add("done");});}
 function resetSteps(){document.querySelectorAll("#translateSteps>div").forEach(el=>el.classList.remove("active","done"));}
 function safeName(n){return n.replace(/[^\w.-]+/g,"_").replace(/\.(mp4|mov|webm)$/i,"")||"video_traducido";}
 fileInput.addEventListener("change",()=>{
@@ -86,7 +86,7 @@ async function runTranslation(){
    const nextStart=i+1<chunks.length?Number(chunks[i+1].timestamp?.[0]??probe.duration):probe.duration;
    const start=Math.max(0,Math.round(startSec*16000));
    const available=Math.max(0,Math.min(dubbed.length-start,Math.round((nextStart-startSec)*16000)));
-   if(available>0&&samples.length>available)samples=resampleAudio(samples,16000,Math.max(8000,Math.round(16000*samples.length/available)));
+   if(available>0&&samples.length>available)samples=resampleAudio(samples,Math.round(16000*samples.length/available),16000);
    const count=Math.min(samples.length,dubbed.length-start);
    if(count>0)for(let j=0;j<count;j++)dubbed[start+j]=samples[j];
    setProgress(63+(i+1)/translated.length*20,"Generando doblaje "+(i+1)+" de "+translated.length+"…");
