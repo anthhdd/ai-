@@ -148,16 +148,17 @@
             <label class="field-label" for="videoPrompt">¿Qué vídeo quieres?</label>
             <textarea id="videoPrompt" class="large-input" placeholder="Ej. Intro para mi canal de tecnología: logo que aparece con partículas y texto animado..."></textarea>
             <div class="opts">
-              <label>Duración<select id="videoDur"><option value="5">5 s</option><option value="8" selected>8 s</option><option value="12">12 s</option></select></label>
-              <label>Formato<select id="videoRatio"><option value="16:9">Horizontal 16:9</option><option value="9:16">Vertical 9:16</option><option value="1:1">Cuadrado 1:1</option></select></label>
+              <label>Plataforma<select id="videoPlatform"><option value="social" selected>TikTok / Shorts / Reels</option><option value="youtube">YouTube horizontal</option><option value="square">Vídeo cuadrado</option></select></label>
+              <label>Duración<select id="videoDur"><option value="5">5 s</option><option value="8">8 s</option><option value="12">12 s</option><option value="15" selected>15 s</option><option value="30">30 s</option><option value="60">60 s</option></select></label>
+              <label>Formato<select id="videoRatio"><option value="9:16" selected>Vertical 9:16</option><option value="16:9">Horizontal 16:9</option><option value="1:1">Cuadrado 1:1</option></select></label>
             </div>
-            <button class="primary-button" id="videoGo">Crear animación <span>→</span></button>
+            <button class="primary-button" id="videoGo">Crear vídeo <span>→</span></button>
             <div class="revise" id="videoReviseBox" hidden>
               <label class="field-label" for="videoRevise">Pídele cambios</label>
               <textarea id="videoRevise" class="large-input small" placeholder="Ej. Más rápido, colores neón y añade el texto «Bienvenidos»"></textarea>
               <button class="primary-button" id="videoReviseGo">Aplicar cambios <span>↻</span></button>
             </div>
-            <p class="hint"><b>Qué es esto:</b> vídeos de gráficos en movimiento (formas, texto, partículas) hechos con código, grabados en tu navegador, sin marca de agua. No es vídeo fotorrealista tipo Sora o Veo: eso necesita servicios de pago o con clave. Mantén esta pestaña visible mientras graba.</p>
+            <p class="hint"><b>Formato social:</b> 9:16 para TikTok, Shorts y Reels; 16:9 para YouTube. NUBI crea motion graphics con escenas y subtítulos, no vídeo fotorrealista. Se exporta en WebM si el navegador no admite MP4. Mantén la pestaña visible durante la grabación.</p>
           </div>
           <div class="web-preview">
             <div class="web-toolbar"><div class="tabs"><button class="tab active" type="button">Vista previa</button></div><div class="tb-right"><button class="mini txt" id="videoRecord" disabled>⏺ Grabar y descargar</button></div></div>
