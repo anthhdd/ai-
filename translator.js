@@ -2,6 +2,8 @@
    Transcripción, traducción, síntesis de voz y exportación en el navegador. */
 const $t = (id) => document.getElementById(id);
 const fileInput = $t("translateFile");
+const selectButton = $t("translateSelectBtn");
+selectButton.addEventListener("click", () => fileInput.click());
 let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, synthesizer = null, outputUrl = null, previewUrl = null, translationAbort = null;
 const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
