@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080a10">
+  <meta name="description" content="NUBI AI: chatea, crea imágenes y construye webs. Sin API key.">
+  <title>NUBI AI — Chat, imágenes y webs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#" aria-label="NUBI AI inicio"><span class="brand-mark">N</span><span>NUBI<span class="brand-light"> AI</span></span></a>
+      <button class="new-chat" id="newChat"><span>＋</span> Nuevo chat</button>
+      <div class="side-label">TU ESPACIO</div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="chat"><span>✳</span> Chat inteligente</button>
+        <button class="nav-item" data-view="image"><span>▧</span> Crear imágenes</button>
+        <button class="nav-item" data-view="web"><span>⌘</span> Webs y apps</button>
+        <button class="nav-item" data-view="video"><span>▶</span> Vídeos</button>
+        <button class="nav-item" data-view="files"><span>▤</span> Archivos y PDF</button>
+      </nav>
+      <div class="side-label history-label">CONVERSACIONES</div>
+      <div id="history" class="history"></div>
+      <div class="sidebar-bottom">
+        <div class="user-card"><div class="avatar">A</div><div><strong>Mi espacio</strong><small>Guardado en este dispositivo</small></div><span class="online-dot"></span></div>
+        <div class="sidebar-note">NUBI AI <span>·</span> Sin API key</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="mobile-menu" id="menuToggle" aria-label="Abrir menú">☰</button>
+        <div class="breadcrumb">NUBI AI <span>/</span> <strong id="crumb">Chat inteligente</strong></div>
+        <div class="top-actions">
+          <span class="status-dot" id="statusDot"></span><span class="status-text" id="statusText"></span>
+          <select id="modelSelect" class="model-select" aria-label="Modelo de IA">
+            <option value="cloud">☁ Nube rápida</option>
+            <option value="fast">⚡ Local ligero</option>
+            <option value="smart">🧠 Local avanzado</option>
+          </select>
+          <button class="icon-button" id="settingsBtn" title="Configuración" aria-label="Configuración">⚙</button>
+        </div>
+      </header>
+      <div class="loadbar" id="loadBar" hidden><div class="loadfill" id="loadFill"></div><span id="loadText"></span></div>
+
+      <!-- CHAT -->
+      <section class="view active-view" id="chatView">
+        <div class="welcome" id="welcome">
+          <div class="eyebrow"><span class="sparkle">✦</span> UNA NUEVA FORMA DE CREAR</div>
+          <h1>Piensa en grande.<br><span>Hazlo realidad.</span></h1>
+          <p class="welcome-copy">Chatea, genera imágenes y construye webs completas. Sin claves, sin registro.</p>
+          <div class="suggestions">
+            <button class="suggestion" data-prompt="Explícame cómo funcionan los agujeros negros de forma sencilla, con ejemplos."><span>✳</span><b>Aprender algo</b><small>Entiende cualquier tema paso a paso</small></button>
+            <button class="suggestion" data-action="web" data-prompt="Una landing page moderna para una cafetería de especialidad, con menú, galería y formulario de reservas"><span>⌘</span><b>Crear una web</b><small>Con vista previa en vivo</small></button>
+            <button class="suggestion" data-action="image" data-prompt="Un gato astronauta explorando una ciudad futurista al atardecer"><span>▧</span><b>Generar una imagen</b><small>De texto a imagen en segundos</small></button>
+            <button class="suggestion" data-prompt="Ayúdame a programar el juego de la serpiente en JavaScript y explícame cómo funciona."><span>◇</span><b>Programar</b><small>Código completo y explicado</small></button>
+            <button class="suggestion" data-action="files"><span>▤</span><b>Preguntar a un documento</b><small>Sube un PDF y consúltalo</small></button>
+            <button class="suggestion" data-action="video" data-prompt="Un vídeo corto de presentación para una app de meditación, con colores suaves, olas y texto animado"><span>▶</span><b>Crear un vídeo</b><small>Animaciones que puedes descargar</small></button>
+          </div>
+        </div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <div class="composer-wrap">
+          <div class="doc-chip" id="docChip" hidden><span>📎</span><b id="docChipName"></b><button id="docChipClear" aria-label="Quitar documento">×</button></div>
+          <div class="attach-strip" id="attachStrip" hidden></div>
+          <div class="composer">
+            <textarea id="prompt" rows="1" placeholder="Pregunta, pega una imagen, o escribe «dibuja…» / «crea una web de…»" aria-label="Escribe tu mensaje"></textarea>
+            <div class="composer-bottom"><div class="composer-tools"><button id="attachBtn" title="Adjuntar archivo" aria-label="Adjuntar archivo">＋</button><span>Texto · fotos · webs · vídeos · documentos</span></div><button class="send-button" id="sendBtn" aria-label="Enviar">↑</button></div>
+          </div>
+          <p class="disclaimer" id="disclaimer"></p>
+        </div>
+      </section>
+
+      <!-- IMÁGENES -->
+      <section class="view tool-view wide-view" id="imageView">
+        <div class="tool-heading"><div class="eyebrow">ESTUDIO CREATIVO</div><h1>Imagina. <span>Crea.</span></h1><p>Describe lo que quieres ver y NUBI lo dibuja.</p></div>
+        <div class="tool-panel wide-panel">
+          <label class="field-label" for="imagePrompt">¿Qué tienes en mente?</label>
+          <textarea id="imagePrompt" class="large-input" placeholder="Ej. Un gato astronauta explorando una ciudad futurista, luz cinematográfica..."></textarea>
+          <div class="opts">
+            <label>Estilo<select id="imageStyle"><option value="real">Realista</option><option value="anime">Anime</option><option value="pixel">Pixel art</option><option value="3d">Render 3D</option><option value="oil">Óleo</option><option value="logo">Logo vectorial</option><option value="none">Sin estilo</option></select></label>
+            <label>Formato<select id="imageSize"><option value="square">Cuadrado</option><option value="wide">Horizontal</option><option value="tall">Vertical</option></select></label>
+            <label class="check"><input type="checkbox" id="imageSvg"> Modo SVG (dibujado por la IA)</label>
+          </div>
+          <button class="primary-button" id="imageGo">Generar imagen <span>→</span></button>
+          <p class="hint">Marca de agua: según la documentación de Pollinations, quitar su logo requiere una cuenta. Si te sale, añade tu clave gratuita en ⚙ Configuración. El modo SVG nunca lleva marca de agua.</p>
+          <div class="stage" id="imageStage" hidden></div>
+        </div>
+        <h3 class="gallery-title" id="galleryTitle" hidden>Tus creaciones</h3>
+        <div class="gallery" id="gallery"></div>
+      </section>
+
+      <!-- WEBS -->
+      <section class="view tool-view wide-view" id="webView">
+        <div class="tool-heading"><div class="eyebrow">CONSTRUCTOR DE WEBS</div><h1>De la idea a la <span>web.</span></h1><p>Describe tu web o app y mírala aparecer en vivo. Luego pídele cambios.</p></div>
+        <div class="web-layout">
+          <div class="web-side tool-panel">
+            <label class="field-label" for="webPrompt">¿Qué quieres construir?</label>
+            <textarea id="webPrompt" class="large-input" placeholder="Ej. Una landing page para mi academia de guitarra, con precios y formulario de contacto..."></textarea>
+            <div class="chips" id="webChips">
+              <button type="button" data-p="Una landing page moderna para una cafetería de especialidad, con menú, galería y formulario de reservas">Cafetería</button>
+              <button type="button" data-p="Un portfolio personal para una diseñadora gráfica, con proyectos, sobre mí y contacto">Portfolio</button>
+              <button type="button" data-p="El juego de la serpiente jugable con teclado y botones táctiles, puntuación y récord">Juego</button>
+              <button type="button" data-p="Una calculadora científica con historial y diseño elegante">Calculadora</button>
+              <button type="button" data-p="Un panel de control (dashboard) con tarjetas de métricas y gráficos dibujados con canvas">Dashboard</button>
+              <button type="button" data-p="Una tienda online de zapatillas con carrito funcional y filtros">Tienda</button>
+            </div>
+            <div class="ref-row"><button type="button" class="chip-btn" id="webAttach">📎 Imagen de referencia</button><span class="ref-name" id="webRefName" hidden><b id="webRefLabel"></b><button type="button" id="webRefClear" aria-label="Quitar">×</button></span></div>
+            <input type="file" id="webImgInput" accept="image/*" hidden>
+            <button class="primary-button" id="webGo">Crear web <span>→</span></button>
+            <div class="revise" id="reviseBox" hidden>
+              <label class="field-label" for="webRevise">Pídele cambios</label>
+              <textarea id="webRevise" class="large-input small" placeholder="Ej. Cambia los colores a tonos verdes y añade una sección de testimonios"></textarea>
+              <button class="primary-button" id="webReviseGo">Aplicar cambios <span>↻</span></button>
+            </div>
+            <p class="hint">Consejo: para webs completas usa el modo <b>☁ Nube rápida</b>. Los modelos locales pequeños hacen webs más sencillas.</p>
+          </div>
+          <div class="web-preview">
+            <div class="web-toolbar">
+              <div class="tabs"><button class="tab active" id="tabPreview">Vista previa</button><button class="tab" id="tabCode">Código</button></div>
+              <div class="tb-right">
+                <button class="mini" id="devDesktop" title="Escritorio">🖥</button><button class="mini" id="devTablet" title="Tablet">▭</button><button class="mini" id="devMobile" title="Móvil">📱</button>
+                <button class="mini txt" id="webCopy">Copiar</button><button class="mini txt" id="webDownload">Descargar</button><button class="mini txt" id="webFull">Ampliar</button>
+              </div>
+            </div>
+            <div class="frame-wrap" id="frameWrap">
+              <div class="web-empty" id="webEmpty"><div class="upload-icon">⌘</div><p>Tu web aparecerá aquí.</p></div>
+              <iframe id="webFrame" title="Vista previa de la web" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-pointer-lock" hidden></iframe>
+              <pre class="code-view" id="webCodeView" hidden></pre>
+              <button class="close-full" id="closeFull" hidden>✕ Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- VÍDEOS -->
+      <section class="view tool-view wide-view" id="videoView">
+        <div class="tool-heading"><div class="eyebrow">ESTUDIO DE VÍDEO</div><h1>Dale <span>movimiento.</span></h1><p>La IA programa una animación y tú la grabas y la descargas como vídeo.</p></div>
+        <div class="web-layout">
+          <div class="web-side tool-panel">
+            <label class="field-label" for="videoPrompt">¿Qué vídeo quieres?</label>
+            <textarea id="videoPrompt" class="large-input" placeholder="Ej. Intro para mi canal de tecnología: logo que aparece con partículas y texto animado..."></textarea>
+            <div class="opts">
+              <label>Duración<select id="videoDur"><option value="5">5 s</option><option value="8" selected>8 s</option><option value="12">12 s</option></select></label>
+              <label>Formato<select id="videoRatio"><option value="16:9">Horizontal 16:9</option><option value="9:16">Vertical 9:16</option><option value="1:1">Cuadrado 1:1</option></select></label>
+            </div>
+            <button class="primary-button" id="videoGo">Crear animación <span>→</span></button>
+            <div class="revise" id="videoReviseBox" hidden>
+              <label class="field-label" for="videoRevise">Pídele cambios</label>
+              <textarea id="videoRevise" class="large-input small" placeholder="Ej. Más rápido, colores neón y añade el texto «Bienvenidos»"></textarea>
+              <button class="primary-button" id="videoReviseGo">Aplicar cambios <span>↻</span></button>
+            </div>
+            <p class="hint"><b>Qué es esto:</b> vídeos de gráficos en movimiento (formas, texto, partículas) hechos con código, grabados en tu navegador, sin marca de agua. No es vídeo fotorrealista tipo Sora o Veo: eso necesita servicios de pago o con clave. Mantén esta pestaña visible mientras graba.</p>
+          </div>
+          <div class="web-preview">
+            <div class="web-toolbar"><div class="tabs"><button class="tab active" type="button">Vista previa</button></div><div class="tb-right"><button class="mini txt" id="videoRecord" disabled>⏺ Grabar y descargar</button></div></div>
+            <div class="video-stage" id="videoStage">
+              <div class="web-empty" id="videoEmpty"><div class="upload-icon">▶</div><p>Tu animación aparecerá aquí.</p></div>
+              <iframe id="videoFrame" title="Vista previa de la animación" sandbox="allow-scripts" hidden></iframe>
+            </div>
+            <div class="video-result" id="videoResult" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ARCHIVOS -->
+      <section class="view tool-view" id="filesView">
+        <div class="tool-heading"><div class="eyebrow">DOCUMENTOS INTELIGENTES</div><h1>Todo más <span>claro.</span></h1><p>Abre un PDF o una imagen con texto y pregúntale lo que quieras. Se procesa en tu navegador.</p></div>
+        <div class="upload-zone" id="dropZone"><div class="upload-icon">↑</div><h2>Suelta tu archivo aquí</h2><p>o búscalo en tu dispositivo</p><label class="primary-button upload-button">Seleccionar archivo<input type="file" id="fileInput" accept=".pdf,.txt,.md,image/*" hidden></label><small>PDF · TXT · PNG · JPG · WEBP</small></div>
+        <div class="file-result" id="fileResult" hidden>
+          <div class="file-result-head"><strong id="fileName">Archivo</strong><button id="clearFile">Quitar</button></div>
+          <div class="file-actions" id="fileActions"><button class="primary-button" id="askDoc">Preguntar al chat sobre esto →</button><button class="primary-button ghost" id="ocrBtn" hidden>Extraer texto de la imagen (OCR)</button></div>
+          <div id="fileContent" class="file-content"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="settingsModal" hidden><div class="modal">
+    <button class="modal-close" id="closeSettings" aria-label="Cerrar">×</button>
+    <div class="eyebrow">PREFERENCIAS</div><h2>Configuración</h2>
+    <p><b>☁ Nube rápida:</b> respuestas muy rápidas con un modelo grande. Tus mensajes se envían al servicio gratuito Pollinations (sin clave). No envíes datos privados.<br><b>⚡🧠 Local:</b> el modelo se ejecuta en tu dispositivo (WebGPU). Privado, pero más lento y menos listo; la primera vez descarga entre 0,3 y 1 GB.</p>
+    <label class="setting-row"><span>Reforzar con Wikipedia (preguntas de datos)</span><input type="checkbox" id="wikiToggle"></label>
+    <label class="field-label" for="pollKey">Clave de Pollinations (opcional)</label>
+    <input type="password" id="pollKey" class="text-input" placeholder="Solo para imágenes sin marca de agua" autocomplete="off">
+    <p class="hint">Se guarda solo en tu navegador. Gratis en enter.pollinations.ai. Sin clave todo sigue funcionando.</p>
+    <div class="setting-row"><span>Historial</span><strong>Solo en este dispositivo</strong></div>
+    <button class="primary-button danger" id="clearData">Borrar historial y datos</button>
+  </div></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <input type="file" id="hiddenFileInput" accept=".pdf,.txt,.md,image/*" hidden>
+  <script src="app.js"></script>
+</body>
+</html>
