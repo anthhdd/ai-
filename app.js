@@ -877,6 +877,43 @@ $("modelSelect").addEventListener("change", (e) => {
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
 });
+// Dictado por voz con Web Speech API (el navegador puede requerir conexión y permiso de micrófono).
+const micBtn = $("micBtn"), micStatus = $("micStatus");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null, micActive = false, dictatedText = "";
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.lang = "es-ES";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.onstart = () => { micActive = true; micBtn.classList.add("recording"); micBtn.textContent = "■"; micBtn.title = "Detener dictado"; micStatus.textContent = "Te escucho… habla con claridad"; };
+  recognition.onresult = (event) => {
+    let finalText = "", interimText = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const part = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += part + " "; else interimText += part;
+    }
+    if (finalText) dictatedText += finalText;
+    promptBox.value = (dictatedText + interimText).trimStart();
+    autoresize();
+  };
+  recognition.onerror = (event) => {
+    const messages = { "not-allowed": "Permite el micrófono en Chrome para usar la voz.", "no-speech": "No he oído nada. Pulsa el micrófono e inténtalo otra vez.", "audio-capture": "No encuentro un micrófono conectado." };
+    micStatus.textContent = messages[event.error] || "No se pudo usar el micrófono. Inténtalo de nuevo.";
+  };
+  recognition.onend = () => {
+    micActive = false; micBtn.classList.remove("recording"); micBtn.textContent = "🎙"; micBtn.title = "Hablar con NUBI";
+    if (promptBox.value.trim()) micStatus.textContent = "Dictado listo. Pulsa enviar para hablar con NUBI.";
+    else micStatus.textContent = "Texto · fotos · voz · webs · vídeos · documentos";
+  };
+  micBtn.addEventListener("click", () => {
+    if (micActive) { recognition.stop(); return; }
+    dictatedText = promptBox.value.trim() ? promptBox.value.trim() + " " : "";
+    try { recognition.start(); } catch (e) { micStatus.textContent = "Espera un momento y vuelve a pulsar el micrófono."; }
+  });
+} else {
+  micBtn.addEventListener("click", () => { micStatus.textContent = "El dictado por voz no está disponible en este navegador. Prueba Chrome actualizado."; });
+}
 $("sendBtn").addEventListener("click", () => (busy ? stopGeneration() : sendMessage()));
 promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); } });
 promptBox.addEventListener("input", autoresize);
