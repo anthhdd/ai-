@@ -15,7 +15,7 @@ Chat, generador de imágenes y constructor de webs. **Sin API key, sin backend.*
 - **Clave opcional de Pollinations** (⚙ Configuración) para quitar la marca de agua de las imágenes. El modo SVG nunca la lleva.
 
 ## Doblaje de vídeos gratis
-- Nueva categoría **Traducir vídeos**: acepta MP4, MOV y WEBM (hasta 60 MB y 3 minutos).
+- Nueva categoría **Traducir vídeos**: acepta MP4, MOV y WEBM (hasta 150 MB y 20 minutos).
 - Whisper Tiny reconoce el diálogo inglés en el navegador; la traducción de texto usa el servicio gratuito de Pollinations.
 - El modelo **MMS-TTS español** genera una voz sintética en español en el navegador. FFmpeg WebAssembly sustituye la pista de audio original y exporta un MP4 sin subtítulos.
 - El vídeo no se sube: transcripción, voz y exportación se hacen en el dispositivo. La traducción sí requiere internet y el servicio gratuito puede tener límites o estar temporalmente caído.
@@ -42,3 +42,6 @@ Sube `index.html`, `app.js`, `styles.css`, `README.md` y `.nojekyll` a tu repo y
 
 ## Límites
 Son servicios gratuitos: pueden ir lentos, tener cuotas o caerse. Ninguna IA gratuita «lo sabe todo». No envíes datos privados en modo nube.
+
+
+**Aviso para vídeos largos:** el límite máximo es 20 minutos y 150 MB. El doblaje se procesa en el navegador y puede consumir mucha memoria y tardar bastante, especialmente en Chromebooks. Para evitar cierres, se recomienda empezar con clips cortos y usar vídeos comprimidos de baja resolución. No se garantiza que todos los dispositivos puedan procesar 20 minutos.
