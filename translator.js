@@ -2,7 +2,7 @@
    Todo el procesamiento multimedia se ejecuta en el navegador. */
 const $t = (id) => document.getElementById(id);
 const fileInput = $t("translateFile");
-let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, outputUrl = null;
+let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, outputUrl = null, previewUrl = null, translationAbort = null;
 const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
 const setStatus = (s) => { $t("translateStatus").textContent=s; $t("translateState").textContent=s; };
@@ -11,14 +11,14 @@ function step(name){document.querySelectorAll("#translateSteps [data-step]").for
 function resetSteps(){document.querySelectorAll("#translateSteps>div").forEach(el=>el.classList.remove("active","done"));}
 function safeName(n){return n.replace(/[^\w.-]+/g,"_").replace(/\.(mp4|mov|webm)$/i,"")||"video_traducido";}
 fileInput.addEventListener("change",()=>{
- const f=fileInput.files?.[0]; selectedVideo=null; $t("translateGo").disabled=true; $t("translateMeta").hidden=true;
+ const f=fileInput.files?.[0]; selectedVideo=null; $t("translateGo").disabled=true; $t("translateMeta").hidden=true; if(previewUrl)URL.revokeObjectURL(previewUrl); previewUrl=null;
  if(!f)return;
  if(!/^video\//.test(f.type)&&! /\.(mp4|mov|webm)$/i.test(f.name)){alert("Selecciona un vídeo MP4, MOV o WEBM.");fileInput.value="";return;}
  if(f.size>MAX_BYTES){alert("El vídeo supera 60 MB. Usa un clip más corto o comprimido para no bloquear Chrome.");fileInput.value="";return;}
  selectedVideo=f;$t("translateFileName").textContent=f.name;$t("translateMeta").hidden=false;
  $t("translateMeta").textContent=(f.size/1024/1024).toFixed(1)+" MB · "+f.type;
  $t("translateGo").disabled=false;$t("translateState").textContent="Vídeo listo";
- $t("translatePreviewBody").innerHTML="";const v=document.createElement("video");v.controls=true;v.src=URL.createObjectURL(f);$t("translatePreviewBody").append(v);
+ $t("translatePreviewBody").innerHTML="";const v=document.createElement("video");v.controls=true;previewUrl=URL.createObjectURL(f);v.src=previewUrl;$t("translatePreviewBody").append(v);
  $t("translateDownload").hidden=true;
 });
 async function loadTranscriber(){
@@ -39,7 +39,8 @@ async function loadFFmpeg(){
  return ffmpeg;
 }
 async function translateText(text){
- const res=await fetch("https://text.pollinations.ai/openai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"openai",stream:false,temperature:0.1,messages:[{role:"system",content:"Traduce del inglés al español de España. Conserva el significado, nombres propios y tono. Devuelve solo la traducción, sin explicaciones."},{role:"user",content:text}],private:true})});
+ translationAbort=new AbortController();const timer=setTimeout(()=>translationAbort?.abort(),45000);
+ let res;try{res=await fetch("https://text.pollinations.ai/openai",{method:"POST",headers:{"Content-Type":"application/json"},signal:translationAbort.signal,body:JSON.stringify({model:"openai",stream:false,temperature:0.1,messages:[{role:"system",content:"Traduce del inglés al español de España. Conserva el significado, nombres propios y tono. Devuelve solo la traducción, sin explicaciones."},{role:"user",content:text}],private:true})});}finally{clearTimeout(timer);translationAbort=null;}
  if(!res.ok)throw new Error("El servicio gratuito de traducción no responde ("+res.status+"). Inténtalo más tarde.");
  const data=await res.json();const out=data.choices?.[0]?.message?.content?.trim();if(!out)throw new Error("La IA no devolvió una traducción.");return out;
 }
@@ -62,14 +63,14 @@ async function runTranslation(){
   if(cancelRequested)throw new Error("Proceso cancelado.");
   setProgress(31,"Transcribiendo el audio inglés…");
   const audio=await ff.readFile("audio.wav");
-  const result=await asr(new Float32Array(await (async()=>{const ctx=new AudioContext({sampleRate:16000});const decoded=await ctx.decodeAudioData(audio.buffer.slice(0));const data=decoded.getChannelData(0);await ctx.close();return data.buffer;})()),{chunk_length_s:25,stride_length_s:5,return_timestamps:true});
+  const audioContext=new AudioContext({sampleRate:16000});let audioSamples;try{const decoded=await audioContext.decodeAudioData(audio.buffer.slice(audio.byteOffset,audio.byteOffset+audio.byteLength));audioSamples=new Float32Array(decoded.getChannelData(0));}finally{await audioContext.close();}const result=await asr(audioSamples,{sampling_rate:16000,chunk_length_s:25,stride_length_s:5,return_timestamps:true});
   const chunks=(result.chunks||[]).filter(c=>c.text?.trim());
   if(!chunks.length)throw new Error("No se ha detectado voz en inglés.");
   step("translate");const translated=[];
   for(let i=0;i<chunks.length;i++){if(cancelRequested)throw new Error("Proceso cancelado.");const original=chunks[i].text.trim();translated.push({...chunks[i],text:await translateText(original)});setProgress(34+(i+1)/chunks.length*35,"Traduciendo frase "+(i+1)+" de "+chunks.length+"…");}
   step("export");setProgress(72,"Creando archivo MP4 con subtítulos…");
   await ff.writeFile("subtitulos_es.srt",new TextEncoder().encode(makeSrt(translated)));
-  await ff.exec(["-i",input,"-i","subtitulos_es.srt","-map","0:v:0","-map","0:a?","-map","1:0","-c:v","copy","-c:a","aac","-c:s","mov_text","-metadata:s:s:0","language=spa","-metadata:s:s:0","title=Español","-movflags","+faststart","video_traducido.mp4"]);
+  await ff.exec(["-i",input,"-i","subtitulos_es.srt","-map","0:v:0","-map","0:a?","-map","1:0","-c:v","libx264","-preset","ultrafast","-crf","27","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-c:s","mov_text","-metadata:s:s:0","language=spa","-metadata:s:s:0","title=Español","-movflags","+faststart","-shortest","video_traducido.mp4"]);
   if(cancelRequested)throw new Error("Proceso cancelado.");
   const data=await ff.readFile("video_traducido.mp4");const blob=new Blob([data.buffer],{type:"video/mp4"});outputUrl=URL.createObjectURL(blob);
   const a=document.createElement("a");a.href=outputUrl;a.download=safeName(selectedVideo.name)+"_es.mp4";a.className="primary-button";a.textContent="↓ Descargar MP4 en español";
@@ -81,5 +82,5 @@ async function runTranslation(){
  finally{running=false;$t("translateGo").disabled=!selectedVideo;$t("translateCancel").hidden=true;if(audioUrl)URL.revokeObjectURL(audioUrl);}
 }
 $t("translateGo").addEventListener("click",runTranslation);
-$t("translateCancel").addEventListener("click",()=>{cancelRequested=true;setStatus("Cancelando…");});
-window.addEventListener("beforeunload",()=>{if(outputUrl)URL.revokeObjectURL(outputUrl);});
+$t("translateCancel").addEventListener("click",()=>{cancelRequested=true;if(translationAbort)translationAbort.abort();setStatus("Cancelando…");});
+window.addEventListener("beforeunload",()=>{if(outputUrl)URL.revokeObjectURL(outputUrl);if(previewUrl)URL.revokeObjectURL(previewUrl);});
