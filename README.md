@@ -14,12 +14,13 @@ Chat, generador de imágenes y constructor de webs. **Sin API key, sin backend.*
 - **Más precisión:** razonamiento paso a paso en el prompt y refuerzo con Wikipedia en preguntas de datos.
 - **Clave opcional de Pollinations** (⚙ Configuración) para quitar la marca de agua de las imágenes. El modo SVG nunca la lleva.
 
-## Traducir vídeos gratis
-- Nueva categoría **Traducir vídeos** en el menú lateral: acepta MP4, MOV y WEBM (hasta 60 MB y 3 minutos).
-- Whisper Tiny en el navegador transcribe el inglés; la traducción de texto usa el endpoint gratuito de Pollinations; FFmpeg WebAssembly genera un MP4 con subtítulos seleccionables en español.
-- El vídeo no se sube: la transcripción y la exportación se hacen en el dispositivo. La traducción del texto sí requiere internet y el servicio gratuito puede tener límites o estar temporalmente caído.
-- **Importante:** esta función conserva el audio original y añade subtítulos en español; todavía no crea doblaje de voz en español. El primer uso descarga modelos y componentes grandes, por lo que conviene empezar con clips cortos en Chromebooks.
-
+## Doblaje de vídeos gratis
+- Nueva categoría **Traducir vídeos**: acepta MP4, MOV y WEBM (hasta 60 MB y 3 minutos).
+- Whisper Tiny reconoce el diálogo inglés en el navegador; la traducción de texto usa el servicio gratuito de Pollinations.
+- El modelo **MMS-TTS español** genera una voz sintética en español en el navegador. FFmpeg WebAssembly sustituye la pista de audio original y exporta un MP4 sin subtítulos.
+- El vídeo no se sube: transcripción, voz y exportación se hacen en el dispositivo. La traducción sí requiere internet y el servicio gratuito puede tener límites o estar temporalmente caído.
+- El doblaje usa una voz sintética única, no imita la voz de las personas del vídeo. Los tiempos se aproximan a los segmentos detectados y puede haber desfases.
+- La primera vez se descargan modelos y componentes; empieza con clips cortos para evitar agotar la memoria de Chrome.
 ## Motores de IA (selector arriba a la derecha)
 | Modo | Cómo funciona | Pros / contras |
 |---|---|---|
