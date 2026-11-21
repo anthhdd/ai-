@@ -174,7 +174,7 @@
 
       <!-- TRADUCTOR DE VÍDEOS -->
       <section class="view tool-view wide-view" id="translateView">
-        <div class="tool-heading"><div class="eyebrow">TRADUCCIÓN DE VÍDEO · GRATIS</div><h1>Entiende cada <span>vídeo.</span></h1><p>Transcribe el audio inglés, traduce los subtítulos al español y descarga un MP4 con subtítulos seleccionables.</p></div>
+        <div class="tool-heading"><div class="eyebrow">TRADUCCIÓN DE VÍDEO · GRATIS</div><h1>Entiende cada <span>vídeo.</span></h1><p>Transcribe el audio inglés, lo traduce y genera una voz española que sustituye al audio original. Sin subtítulos.</p></div>
         <div class="web-layout translate-layout">
           <div class="web-side tool-panel">
             <label class="field-label" for="translateFile">Vídeo en inglés</label>
@@ -184,14 +184,15 @@
             <div class="translate-steps" id="translateSteps">
               <div data-step="load"><i>1</i><span>Cargar IA de transcripción</span><small>Modelo gratuito · se descarga una vez</small></div>
               <div data-step="transcribe"><i>2</i><span>Escuchar y transcribir inglés</span><small>El vídeo se procesa en tu navegador</small></div>
-              <div data-step="translate"><i>3</i><span>Traducir subtítulos al español</span><small>Traducción gratuita por internet</small></div>
-              <div data-step="export"><i>4</i><span>Crear MP4 con subtítulos</span><small>El audio original se conserva</small></div>
+              <div data-step="translate"><i>3</i><span>Traducir el diálogo al español</span><small>Traducción gratuita por internet</small></div>
+              <div data-step="voice"><i>4</i><span>Generar doblaje en español</span><small>Voz sintética generada en tu navegador</small></div>
+              <div data-step="export"><i>5</i><span>Exportar MP4 doblado</span><small>Se sustituye el audio inglés; sin subtítulos</small></div>
             </div>
             <button class="primary-button" id="translateGo" disabled>Traducir vídeo <span>→</span></button>
             <button class="primary-button ghost translate-cancel" id="translateCancel" hidden>Cancelar proceso</button>
             <div class="translate-progress" id="translateProgress" hidden><div><span id="translateStatus">Preparando…</span><b id="translatePercent">0%</b></div><div class="translate-bar"><i id="translateBar"></i></div></div>
-            <p class="hint">Gratis y sin claves API. La transcripción se ejecuta en tu dispositivo; la traducción del texto usa un servicio gratuito de IA. No subimos el archivo de vídeo. Para evitar que Chrome se cierre, empieza con clips cortos.</p>
-            <p class="translate-warning">Importante: esta versión añade subtítulos en español y conserva el audio inglés. No genera todavía una voz doblada en español.</p>
+            <p class="hint">Gratis y sin claves API. La transcripción y la voz española se generan en tu dispositivo. La traducción del texto usa un servicio gratuito de IA. El vídeo no se sube. La primera vez se descargan modelos de IA; empieza con clips cortos.</p>
+            <p class="translate-warning">El resultado tendrá únicamente una voz sintética en español: se elimina el audio inglés y no se añaden subtítulos. La voz no imita a la persona original.</p>
           </div>
           <div class="web-preview translate-preview">
             <div class="web-toolbar"><div class="tabs"><button class="tab active" type="button">Vista previa</button></div><div class="tb-right"><span class="translate-state" id="translateState">Esperando vídeo</span></div></div>
