@@ -23,6 +23,13 @@ Chat, generador de imágenes y constructor de webs. **Sin API key, sin backend.*
 
 Si la nube falla y tu navegador tiene WebGPU, NUBI cambia sola a la IA local. Las imágenes usan Pollinations; si no responde, la IA dibuja un SVG.
 
+## Búsqueda web v4
+- Nueva sección **Buscar en Internet** en el menú lateral.
+- Busca páginas públicas con DuckDuckGo y vídeos de YouTube; abre resultados en una pestaña nueva.
+- Permite enviar el tema y los resultados visibles al chat para que NUBI los explique.
+- La búsqueda usa un servicio proxy externo (Jina Reader), por lo que puede fallar, aplicar límites o no indexar algunas páginas. No equivale a acceso directo a todas las webs.
+- La interfaz ya no impone un máximo fijo de imágenes adjuntas ni de elementos en la galería. El navegador, el almacenamiento local, el tamaño de la petición y el proveedor de IA siguen teniendo límites técnicos; el modelo recibe un máximo práctico de 20 imágenes por mensaje.
+
 ## Publicar
 Sube `index.html`, `app.js`, `styles.css`, `README.md` y `.nojekyll` a tu repo y activa **Settings → Pages → Deploy from a branch → main / (root)**. Borra `worker.js` si aún existe.
 
