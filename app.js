@@ -825,14 +825,14 @@ function autoresize() { promptBox.style.height = "auto"; promptBox.style.height 
 
 document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 $("menuToggle").addEventListener("click", () => $("sidebar").classList.toggle("open"));
-$("settingsBtn").addEventListener("click", () => { $("wikiToggle").checked = wikiEnabled; $("pollKey").value = store.get("nubi-pkey", ""); $("settingsModal").hidden = false; });
+$("settingsBtn").addEventListener("click", () => { $("wikiToggle").checked = wikiEnabled; $("settingsModal").hidden = false; });
 $("closeSettings").addEventListener("click", () => ($("settingsModal").hidden = true));
 $("settingsModal").addEventListener("click", (e) => { if (e.target === $("settingsModal")) $("settingsModal").hidden = true; });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("settingsModal").hidden = true; $("frameWrap").classList.remove("fullscreen"); $("closeFull").hidden = true; } });
 $("wikiToggle").addEventListener("change", (e) => { wikiEnabled = e.target.checked; store.set("nubi-wiki", wikiEnabled); });
 $("clearData").addEventListener("click", () => {
   if (!confirm("¿Borrar todas las conversaciones y la galería?")) return;
-  ["nubi-chats-v2", "nubi-gallery", "nubi-pkey"].forEach(store.del); chats = []; gallery = []; currentId = null;
+  ["nubi-chats-v2", "nubi-gallery"].forEach(store.del); chats = []; gallery = []; currentId = null;
   renderMessages(); renderHistory(); renderGallery(); $("settingsModal").hidden = true; toast("Datos borrados");
 });
 $("modelSelect").addEventListener("change", (e) => {
