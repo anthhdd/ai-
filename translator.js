@@ -7,7 +7,7 @@ const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
 const setStatus = (s) => { $t("translateStatus").textContent=s; $t("translateState").textContent=s; };
 const setProgress = (p,s) => { $t("translateProgress").hidden=false; $t("translatePercent").textContent=Math.round(p)+"%"; $t("translateBar").style.width=Math.max(0,Math.min(100,p))+"%"; if(s)setStatus(s); };
-function step(name){document.querySelectorAll("#translateSteps [data-step]").forEach(el=>{el.classList.toggle("active",el.dataset.step===name);if(["load","transcribe","translate","export"].indexOf(el.dataset.step)<["load","transcribe","translate","export"].indexOf(name))el.classList.add("done");});}
+function step(name){document.querySelectorAll("#translateSteps [data-step]").forEach(el=>{el.classList.toggle("active",el.dataset.step===name);if(["load","transcribe","translate","voice","export"].indexOf(el.dataset.step)<["load","transcribe","translate","voice","export"].indexOf(name))el.classList.add("done");});}
 function resetSteps(){document.querySelectorAll("#translateSteps>div").forEach(el=>el.classList.remove("active","done"));}
 function safeName(n){return n.replace(/[^\w.-]+/g,"_").replace(/\.(mp4|mov|webm)$/i,"")||"video_traducido";}
 fileInput.addEventListener("change",()=>{
@@ -76,16 +76,21 @@ async function runTranslation(){
   for(let i=0;i<chunks.length;i++){if(cancelRequested)throw new Error("Proceso cancelado.");translated.push(await translateText(chunks[i].text.trim()));setProgress(35+(i+1)/chunks.length*25,"Traduciendo frase "+(i+1)+" de "+chunks.length+"…");}
   if(cancelRequested)throw new Error("Proceso cancelado.");
   step("voice");setProgress(61,"Preparando voz española…");const tts=await loadSynthesizer();
-  const audioParts=[];let totalSamples=0;const pause=new Float32Array(2400);
+  const dubbed=new Float32Array(Math.ceil((probe.duration+1)*16000));
   for(let i=0;i<translated.length;i++){
    if(cancelRequested)throw new Error("Proceso cancelado.");
    const spoken=await tts(translated[i]);
    if(!spoken?.audio?.length)throw new Error("El modelo de voz no ha generado audio.");
-   const samples=spoken.sampling_rate===16000?spoken.audio:resampleAudio(spoken.audio,spoken.sampling_rate,16000);
-   audioParts.push(samples,pause);totalSamples+=samples.length+pause.length;
+   let samples=spoken.sampling_rate===16000?spoken.audio:resampleAudio(spoken.audio,spoken.sampling_rate,16000);
+   const startSec=Number(chunks[i].timestamp?.[0]??0);
+   const nextStart=i+1<chunks.length?Number(chunks[i+1].timestamp?.[0]??probe.duration):probe.duration;
+   const start=Math.max(0,Math.round(startSec*16000));
+   const available=Math.max(0,Math.min(dubbed.length-start,Math.round((nextStart-startSec)*16000)));
+   if(available>0&&samples.length>available)samples=resampleAudio(samples,16000,Math.max(8000,Math.round(16000*samples.length/available)));
+   const count=Math.min(samples.length,dubbed.length-start);
+   if(count>0)for(let j=0;j<count;j++)dubbed[start+j]=samples[j];
    setProgress(63+(i+1)/translated.length*20,"Generando doblaje "+(i+1)+" de "+translated.length+"…");
   }
-  const dubbed=new Float32Array(totalSamples);let offset=0;for(const part of audioParts){dubbed.set(part,offset);offset+=part.length;}
   step("export");setProgress(85,"Creando MP4 con voz española…");
   await ff.writeFile("doblaje.raw",new Uint8Array(dubbed.buffer));
   await ff.exec(["-f","f32le","-ar","16000","-ac","1","-i","doblaje.raw","-c:a","pcm_s16le","doblaje.wav"]);
