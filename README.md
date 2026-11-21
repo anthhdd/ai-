@@ -4,8 +4,8 @@ Chat, generador de imágenes y constructor de webs. **Sin API key, sin backend.*
 
 ## Qué hace
 - **Chat rápido** con respuestas en directo, Markdown, tablas y bloques de código con botón de copiar. Historial real de conversaciones (se guarda en tu navegador).
-- **Crear imágenes**: estilos (realista, anime, pixel art, 3D, óleo, logo), formatos y galería. También desde el chat: «dibuja una imagen de…».
-- **Webs y apps**: describe lo que quieres, mira la vista previa en vivo, pide cambios, cambia a vista móvil/tablet, copia o descarga el `.html`. También desde el chat: «crea una web de…».
+- **Crear imágenes**: estilos (realista, anime, pixel art, 3D, óleo, logo), formatos y galería. Usa Pollinations cuando está disponible; si el proveedor aplica límites o falla, NUBI intenta una ilustración SVG de respaldo. El respaldo vectorial no equivale a una imagen fotorrealista.
+- **Webs y apps**: constructor reforzado con instrucciones de diseño de producto, UX/UI, accesibilidad, responsive y funcionalidad real. Describe lo que quieres, mira la vista previa en vivo, pide cambios, cambia a vista móvil/tablet, copia o descarga el `.html`. También desde el chat: «crea una web de…».
 - **Documentos**: lee PDF/TXT, extrae texto de imágenes (OCR) y permite preguntar sobre ellos.
 
 ## Novedades v3
@@ -21,7 +21,7 @@ Chat, generador de imágenes y constructor de webs. **Sin API key, sin backend.*
 | ⚡ Local ligero | Qwen2.5 0.5B en tu navegador (WebGPU) | Privado, descarga ~0,3 GB. Menos potente. |
 | 🧠 Local avanzado | Qwen2.5 1.5B en tu navegador (WebGPU) | Privado, descarga ~1 GB. Más lento. |
 
-Si la nube falla y tu navegador tiene WebGPU, NUBI cambia sola a la IA local. Las imágenes usan Pollinations; si no responde, la IA dibuja un SVG.
+Si la nube falla y tu navegador tiene WebGPU, NUBI cambia sola a la IA local. Las imágenes usan Pollinations; el proveedor puede limitar temporalmente las solicitudes gratuitas (por ejemplo, una imagen cada cierto intervalo). NUBI no puede eliminar los límites del proveedor. Si falla, intenta un SVG de respaldo; este es vectorial y más sencillo, no una generación fotográfica real.
 
 ## Búsqueda web v4
 - Nueva sección **Buscar en Internet** en el menú lateral.
