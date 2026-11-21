@@ -146,7 +146,8 @@ async function cloudChat(messages, { onToken, temperature = 0.7 }) {
 
 let localEngine = null, localKey = null, localLoading = null;
 async function ensureLocal(base) {
-  if (!navigator.gpu) throw new Error("Tu navegador no admite WebGPU (necesario para la IA local). Usa Chrome o Edge actualizados, o el modo ☁ Nube.");
+  if (!navigator.gpu) throw new Error("Tu navegador no admite WebGPU (necesario para la IA local). Usa el modo ☁ Nube.");
+  if (navigator.deviceMemory && navigator.deviceMemory <= 4) throw new Error("Este Chromebook tiene poca memoria disponible para ejecutar modelos locales. Usa ☁ Nube para evitar que Chrome se bloquee.");
   if (localEngine && localKey === base) return localEngine;
   if (localLoading && localLoading.key === base) return localLoading.p;
   const p = (async () => {
@@ -200,7 +201,7 @@ async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTo
     try { return await cloudChat(messages, { onToken, temperature }); }
     catch (err) {
       if (stopRequested) return "";
-      if (!navigator.gpu) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + ") y tu navegador no admite IA local. Inténtalo en unos minutos.");
+      if (!navigator.gpu || (navigator.deviceMemory && navigator.deviceMemory <= 4)) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + "). No iniciaré un modelo local porque podría agotar la memoria de este Chromebook. Inténtalo en unos minutos.");
       toast("La nube no responde. Usando IA local (la primera vez descarga el modelo)…");
       return await localChat(messages, { onToken, base: "0.5B", temperature, maxTokens });
     }
@@ -221,7 +222,7 @@ function wantsYouTube(q) {
   return /youtube|youtu[.]be|vídeos?|videos|tutorial(?:es)?|ver cómo/i.test(q);
 }
 function wantsWebSearch(q) {
-  return /\\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\\b/i.test(q) || looksFactual(q);
+  return /\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\b/i.test(q);
 }
 async function readerText(url, ms = 9000) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), ms);
@@ -254,22 +255,22 @@ async function chatWebContext(query) {
   if (needYT) jobs.push(readerText("https://www.youtube.com/results?search_query=" + encodeURIComponent(query), 10000).then(t => ({ kind: "YouTube", text: t })).catch(() => null));
   if (!needYT || /internet|web|fuentes|investiga|busca/i.test(query)) jobs.push(readerText("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), 10000).then(t => ({ kind: "Web", text: t })).catch(() => null));
   const results = (await Promise.all(jobs)).filter(Boolean);
-  if (!results.length) return "\\n\\nNo se pudo acceder a los buscadores públicos en esta ocasión. No inventes resultados ni afirmes que has buscado.";
-  let context = "\\n\\nRESULTADOS DE BÚSQUEDA (obtenidos ahora, sin API key):";
+  if (!results.length) return "\n\nNo se pudo acceder a los buscadores públicos en esta ocasión. No inventes resultados ni afirmes que has buscado.";
+  let context = "\n\nRESULTADOS DE BÚSQUEDA (obtenidos ahora, sin API key):";
   for (const result of results) {
     const links = extractSearchLinks(result.text, result.kind === "YouTube");
-    context += "\\n\\n" + result.kind + ":";
-    if (!links.length) { context += "\\n" + result.text.slice(0, 3000); continue; }
+    context += "\n\n" + result.kind + ":";
+    if (!links.length) { context += "\n" + result.text.slice(0, 3000); continue; }
     const picked = links.slice(0, result.kind === "YouTube" ? 4 : 3);
     const pages = await Promise.all(picked.map(async link => {
       try { return await readerText(link.url, 6500); } catch (e) { return ""; }
     }));
     picked.forEach((link, i) => {
-      context += "\\n- " + link.title + " — " + link.url;
-      if (pages[i]) context += "\\n  Contenido recuperado: " + pages[i].replace(/\\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
+      context += "\n- " + link.title + " — " + link.url;
+      if (pages[i]) context += "\n  Contenido recuperado: " + pages[i].replace(/\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
     });
   }
-  context += "\\n\\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
+  context += "\n\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
   return context.slice(0, 8500);
 }
 async function wikiContext(query, ms = 3500) {
@@ -552,7 +553,8 @@ async function generateSvg(prompt) {
 }
 let localImageModule = null, localImageLoading = null, localImageReady = false;
 async function ensureLocalImageModel(onProgress = () => {}) {
-  if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
+  if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. No se ha enviado tu prompt a ningún servicio.");
+  if (navigator.deviceMemory && navigator.deviceMemory <= 4) throw new Error("La generación local de imágenes necesita demasiada memoria para este Chromebook. Activa «Modo SVG» para crear una ilustración ligera sin cargar SD-Turbo.");
   if (localImageModule && localImageReady) return localImageModule;
   if (localImageLoading) return localImageLoading;
   localImageLoading = (async () => {
@@ -734,7 +736,7 @@ function openWebCode(code) {
 function setDevice(w) { $("frameWrap").style.setProperty("--fw", w); }
 
 /* ---------- vídeos (animaciones de canvas grabadas en el navegador) ---------- */
-const VIDEO_SYSTEM = "Eres un director creativo y animador experto en vídeos cortos para TikTok, YouTube Shorts, Instagram Reels y YouTube. Devuelve SOLO un bloque de código JavaScript que defina function draw(ctx, t, W, H) { ... }. Canvas 2D, sin librerías, DOM ni red. Dibuja el fotograma completo en cada llamada y escala todo con W y H. Diseña un vídeo con gancho visual en el primer segundo, escenas diferenciadas, ritmo rápido, transiciones suaves, subtítulos grandes y legibles, frases cortas en español, jerarquía tipográfica y cierre/CTA. En vertical deja márgenes seguros arriba y abajo para la interfaz de TikTok/Reels/Shorts. Evita párrafos largos y adapta escenas a la duración.";
+const VIDEO_SYSTEM = "Eres un director creativo senior, diseñador de motion graphics y editor de anuncios para TikTok, YouTube Shorts, Reels y YouTube. Devuelve ÚNICAMENTE JavaScript válido con una declaración exacta function draw(ctx, t, W, H) { ... }. No uses Markdown ni explicaciones. Canvas 2D puro, sin librerías, DOM, imágenes externas, red ni dependencias. El vídeo debe parecer una pieza de diseño profesional, no una demo de programación.\n\nDIRECCIÓN DE ARTE: crea una composición completa con fondo trabajado, profundidad, iluminación simulada, capas, formas vectoriales limpias, detalles y paleta coherente. Usa tipografía Canvas con tamaños grandes y jerarquía clara. Evita el aspecto genérico de gradientes con círculos flotantes, lluvia de partículas sin sentido, textos diminutos, pantallas vacías y elementos cortados.\n\nNARRATIVA Y MONTAJE: divide la duración en 4-7 escenas con tiempos claramente definidos. Cada escena debe tener una composición y propósito distintos. Primer segundo: gancho visual potente. Después: progresión con información breve y visual. Final: cierre memorable y CTA. Añade transiciones intencionadas entre escenas (cortes, wipes, zooms, máscaras o desplazamientos), movimiento con easing suave y animaciones sincronizadas. No mantengas la misma pantalla todo el vídeo.\n\nTEXTO: redacta frases cortas en español, sin errores, con alto contraste, sombra o placa cuando haga falta. Anima la entrada y salida de cada titular. Mantén márgenes seguros en vertical para la interfaz de redes. No inventes marcas, cifras ni afirmaciones que el usuario no haya pedido.\n\nIMPLEMENTACIÓN: dibuja el fotograma completo en cada llamada; t son segundos desde el inicio y se repite durante la vista previa. Escala posiciones y tamaños según W y H para que funcione en 9:16, 16:9 y 1:1. Usa funciones auxiliares dentro del mismo código si ayudan. Limita los bucles de partículas y cálculos para que funcione con fluidez en un Chromebook modesto. Asegúrate de que function draw(ctx, t, W, H) exista y no lance errores para ningún t entre 0 y la duración.";
 let videoCode = "", videoBusy = false;
 const VIDEO_DIMS = { "16:9": [1280, 720], "9:16": [720, 1280], "1:1": [1024, 1024] };
 const VIDEO_PRESETS = { social: { ratio: "9:16", duration: "15" }, youtube: { ratio: "16:9", duration: "30" }, square: { ratio: "1:1", duration: "15" } };
@@ -751,18 +753,22 @@ function videoHarness(code, W, H, dur) {
   'if(!draw)err("La animación no definió la función draw.");' +
   'let rec=false,start=performance.now(),mr=null,chunks=[],n=0;' +
   'function frame(now){let t=(now-start)/1000;if(rec){if(t>=DUR){rec=false;try{mr.stop();}catch(e){}t=DUR;}}else t=t%DUR;' +
+  'if(document.hidden){requestAnimationFrame(frame);return;}' +
   'if(draw){try{ctx.save();ctx.clearRect(0,0,W,H);draw(ctx,t,W,H);ctx.restore();}catch(e){err(e);}}' +
   'if(rec&&(n++%8===0))parent.postMessage({type:"nubi-progress",p:Math.min(1,t/DUR)},"*");requestAnimationFrame(frame);}' +
   'function startRec(){if(rec)return;const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];' +
   'const mt=window.MediaRecorder&&types.find(x=>MediaRecorder.isTypeSupported(x));if(!mt){err("Tu navegador no puede grabar vídeo. Usa Chrome, Edge o Firefox.");return;}' +
-  'mr=new MediaRecorder(cv.captureStream(24),{mimeType:mt,videoBitsPerSecond:3500000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
+  'mr=new MediaRecorder(cv.captureStream(20),{mimeType:mt,videoBitsPerSecond:1200000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
   'mr.onstop=()=>{parent.postMessage({type:"nubi-video",blob:new Blob(chunks,{type:mt.split(";")[0]})},"*");};mr.start(250);start=performance.now();rec=true;}' +
   'addEventListener("message",e=>{if(e.data&&e.data.cmd==="record")startRec();});requestAnimationFrame(frame);' +
   '<\/script></body></html>';
 }
 function setVideoPreview() {
-  const [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"];
+  let [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"];
   const dur = +$("videoDur").value || 8;
+  const memory = navigator.deviceMemory || 8;
+  const scale = memory <= 4 ? 0.5 : memory <= 8 ? 0.65 : 0.8;
+  W = Math.round(W * scale); H = Math.round(H * scale);
   $("videoStage").style.setProperty("--ar", W + "/" + H);
   $("videoStage").style.setProperty("--sw", "min(100%," + Math.round(68 * W / H) + "vh)");
   $("videoFrame").srcdoc = videoHarness(videoCode, W, H, dur);
@@ -773,7 +779,7 @@ async function buildVideo(promptText, revise) {
   if (!promptText || videoBusy) { if (!promptText) toast("Describe primero tu vídeo."); return; }
   videoBusy = true; $("videoGo").disabled = true; $("videoReviseGo").disabled = true;
   const [W, H] = VIDEO_DIMS[$("videoRatio").value] || VIDEO_DIMS["16:9"]; const dur = +$("videoDur").value || 8;
-  const spec = "Duración total: " + dur + " segundos. Lienzo: " + W + "x" + H + " (" + $("videoRatio").value + "). Destino: " + $("videoPlatform").value + ". Incluye gancho inicial, escenas, subtítulos y cierre.";
+  const spec = "BRIEF DE PRODUCCIÓN\nDuración: " + dur + " segundos. Resolución: " + W + "x" + H + " (" + $("videoRatio").value + "). Plataforma: " + $("videoPlatform").value + ".\nCrea una pieza completa, visualmente rica y lista para publicar. Diseña 4-7 escenas distintas con ritmo de edición, no una sola animación repetida. Define un gancho en el primer segundo, desarrollo visual con titulares cortos y un cierre/CTA. Usa una paleta consistente, tipografía grande, fondos y composiciones diferentes por escena, transiciones suaves y movimiento con intención. Todo el texto visible debe estar en español y ser legible en móvil. No uses recursos externos: dibuja todos los elementos con Canvas. Ajusta la complejidad para que se reproduzca con fluidez en un Chromebook.";
   const msgs = revise && videoCode
     ? [{ role: "system", content: VIDEO_SYSTEM }, { role: "user", content: spec + "\nEste es el código actual:\n```js\n" + videoCode.slice(0, mode === "cloud" ? 20000 : 4500) + "\n```\nAplica estos cambios y devuelve el código COMPLETO actualizado: " + promptText }]
     : [{ role: "system", content: VIDEO_SYSTEM }, { role: "user", content: spec + "\nTema: " + promptText }];
@@ -807,7 +813,133 @@ window.addEventListener("message", (e) => {
   }
 });
 
+/* ---------- NUBI Clip Studio: edición local de clips ---------- */
+let clipObjectUrl = null, clipSourceFile = null, clipRenderFrame = 0, clipRecorder = null, clipRenderUrl = null;
+const clipVideo = $("clipVideo"), clipCanvas = $("clipCanvas"), clipCtx = clipCanvas.getContext("2d", { alpha: false });
+function stopClipPreview() { cancelAnimationFrame(clipRenderFrame); if (clipVideo && !clipVideo.paused) clipVideo.pause(); }
+function clipTime(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+function drawClipFrame() {
+  if (!clipSourceFile || !clipVideo.videoWidth) return;
+  const W = clipCanvas.width, H = clipCanvas.height, vw = clipVideo.videoWidth, vh = clipVideo.videoHeight;
+  const zoom = Number($("clipZoom").value) || 1;
+  const base = Math.max(W / vw, H / vh), scale = base * zoom;
+  const sw = W / scale, sh = H / scale;
+  const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+  clipCtx.fillStyle = "#05070c"; clipCtx.fillRect(0,0,W,H);
+  clipCtx.drawImage(clipVideo,sx,sy,sw,sh,0,0,W,H);
+  const caption = $("clipCaption").value.trim();
+  if (caption) {
+    const style = $("clipStyle").value, font = style === "clean" ? "700 25px Arial" : "900 30px Arial";
+    const lines = caption.match(/.{1,24}(?:\s|$)/g) || [caption];
+    const shown = lines.slice(0,3).map(x=>x.trim());
+    clipCtx.textAlign = "center"; clipCtx.textBaseline = "middle"; clipCtx.font = font;
+    const y = H * .78, lineH = 36, maxW = W - 34;
+    shown.forEach((line,i)=>{
+      let text=line;
+      while (clipCtx.measureText(text).width>maxW && text.length>4) text=text.slice(0,-2)+"…";
+      const yy=y+(i-(shown.length-1)/2)*lineH;
+      if(style==="clean"){clipCtx.fillStyle="rgba(0,0,0,.55)";clipCtx.fillRect(12,yy-18,W-24,36);}
+      else {clipCtx.lineWidth=5;clipCtx.strokeStyle="#090b12";clipCtx.strokeText(text,W/2,yy,maxW);}
+      clipCtx.fillStyle=style==="neon"?"#8df7ff":"#fff";clipCtx.fillText(text,W/2,yy,maxW);
+    });
+  }
+}
+function refreshClipPreview() {
+  if (!clipSourceFile || !clipVideo.videoWidth) return;
+  const start=clipTime($("clipStart").value), end=clipTime($("clipEnd").value);
+  const target=Math.min(Math.max(start,end-.1),Math.max(0,clipVideo.duration-.05));
+  if(Math.abs(clipVideo.currentTime-target)>.15) clipVideo.currentTime=target;
+  drawClipFrame();
+}
+$("clipFile").addEventListener("change", e=>{
+  const file=e.target.files&&e.target.files[0]; if(!file)return;
+  if(!file.type.startsWith("video/")){toast("Selecciona un archivo de vídeo.");return;}
+  stopClipPreview(); if(clipObjectUrl)URL.revokeObjectURL(clipObjectUrl);
+  clipSourceFile=file; clipObjectUrl=URL.createObjectURL(file);
+  clipVideo.src=clipObjectUrl; clipVideo.hidden=false; $("clipCanvas").hidden=false;
+  $("clipFileLabel").textContent=file.name; $("clipExport").disabled=true;
+  clipVideo.onloadedmetadata=()=>{
+    $("clipDuration").textContent=Math.floor(clipVideo.duration)+" s";
+    $("clipStart").value="0"; $("clipEnd").value=Math.min(30,Math.floor(clipVideo.duration*10)/10);
+    $("clipEnd").max=clipVideo.duration; $("clipStart").max=clipVideo.duration;
+    $("clipStage").querySelector(".web-empty").hidden=true; $("clipExport").disabled=false;
+    refreshClipPreview();
+  };
+  clipVideo.onerror=()=>toast("No se pudo abrir el vídeo. Prueba con MP4 o WebM.");
+});
+["clipStart","clipEnd","clipCaption","clipZoom","clipStyle"].forEach(id=>$(id).addEventListener("input",refreshClipPreview));
+clipVideo.addEventListener("seeked",drawClipFrame);
+$("clipAnalyze").addEventListener("click",async()=>{
+  const transcript=$("clipTranscript").value.trim();
+  if(!clipSourceFile){toast("Sube primero el vídeo que quieras editar.");return;}
+  if(!transcript){toast("Pega una transcripción con tiempos para que la IA pueda encontrar el mejor momento.");$("clipTranscript").focus();return;}
+  const btn=$("clipAnalyze");btn.disabled=true;btn.textContent="✦ Analizando…";
+  const duration=clipVideo.duration||0;
+  try{
+    const prompt="Analiza esta transcripción con marcas de tiempo y elige el fragmento más atractivo para un Short. Prioriza sorpresa, emoción, humor, tensión, reacción o una frase que genere curiosidad. Duración objetivo 15-35 segundos, nunca fuera de 0-"+duration.toFixed(1)+" segundos. Devuelve SOLO JSON válido: {\"start\":numero,\"end\":numero,\"hook\":\"gancho corto en español\",\"reason\":\"motivo breve\"}. Los tiempos deben ser segundos decimales. TRANSCRIPCIÓN:\\n"+transcript;
+    const out=await generate([{role:"system",content:"Eres un editor experto en clips virales para TikTok, Shorts y Reels. No inventes contenido ni tiempos; usa solo las marcas de tiempo dadas. Devuelve JSON válido."},{role:"user",content:prompt}],{temperature:.2,maxTokens:350});
+    const match=out.match(/\{[\s\S]*\}/);if(!match)throw new Error("La IA no devolvió una selección válida.");
+    const pick=JSON.parse(match[0]), start=Math.max(0,Math.min(duration-1,Number(pick.start))), end=Math.max(start+1,Math.min(duration,Number(pick.end)));
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)throw new Error("Los tiempos sugeridos no son válidos.");
+    $("clipStart").value=start.toFixed(1);$("clipEnd").value=end.toFixed(1);
+    $("clipCaption").value=String(pick.hook||"").slice(0,110);
+    const panel=$("clipAnalysis");panel.hidden=false;panel.innerHTML="<b>✦ Momento recomendado: "+start.toFixed(1)+"s – "+end.toFixed(1)+"s</b><p>"+esc(pick.reason||"La IA ha elegido este fragmento.")+"</p>";
+    refreshClipPreview();toast("Momento seleccionado. Puedes ajustar el recorte antes de exportar.");
+  }catch(err){toast(err.message||"No se pudo analizar el texto.");}
+  finally{btn.disabled=false;btn.textContent="✦ Encontrar momento viral";}
+});
+$("clipExport").addEventListener("click",async()=>{
+  if(!clipSourceFile||!clipVideo.videoWidth||clipRecorder&&clipRecorder.state==="recording")return;
+  const start=clipTime($("clipStart").value),end=clipTime($("clipEnd").value);
+  if(end<=start||end>clipVideo.duration+.05){toast("Revisa los tiempos de inicio y final.");return;}
+  const btn=$("clipExport"),progress=$("clipProgress"),bar=$("clipProgressBar");
+  btn.disabled=true;progress.hidden=false;bar.value=0;$("clipProgressText").textContent="Preparando exportación…";
+  try{
+    const stream=clipCanvas.captureStream(24);
+    let combined=[...stream.getVideoTracks()];
+    try{const source=clipVideo.captureStream?clipVideo.captureStream():null;if(source)combined=combined.concat(source.getAudioTracks());}catch(e){}
+    const output=new MediaStream(combined);
+    const mime=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"].find(x=>MediaRecorder.isTypeSupported(x));
+    if(!mime)throw new Error("Este navegador no permite exportar WebM.");
+    const chunks=[];clipRecorder=new MediaRecorder(output,{mimeType:mime,videoBitsPerSecond:1600000});
+    clipRecorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+    const finished=new Promise((resolve,reject)=>{clipRecorder.onstop=()=>resolve(new Blob(chunks,{type:mime}));clipRecorder.onerror=()=>reject(new Error("Error al grabar el clip."));});
+    clipVideo.muted=false;clipVideo.currentTime=start;await new Promise(resolve=>{if(Math.abs(clipVideo.currentTime-start)<.03)resolve();else clipVideo.addEventListener("seeked",resolve,{once:true});});
+    drawClipFrame();clipRecorder.start(250);await clipVideo.play();
+    const tick=()=>{
+      if(clipVideo.currentTime>=end||clipVideo.ended){clipVideo.pause();if(clipRecorder&&clipRecorder.state!=="inactive")clipRecorder.stop();return;}
+      drawClipFrame();bar.value=Math.min(100,((clipVideo.currentTime-start)/(end-start))*100);
+      $("clipProgressText").textContent="Exportando… "+Math.round(bar.value)+"%";
+      clipRenderFrame=requestAnimationFrame(tick);
+    };tick();
+    const blob=await finished;output.getTracks().forEach(t=>t.stop());clipVideo.pause();clipVideo.muted=true;
+    if(clipRenderUrl)URL.revokeObjectURL(clipRenderUrl);clipRenderUrl=URL.createObjectURL(blob);
+    const result=$("clipResult");result.hidden=false;result.innerHTML="";
+    const preview=document.createElement("video");preview.src=clipRenderUrl;preview.controls=true;preview.playsInline=true;
+    const link=document.createElement("a");link.href=clipRenderUrl;link.download="nubi-short.webm";link.className="primary-button";link.textContent="Descargar Short (.webm)";
+    result.append(preview,link);bar.value=100;$("clipProgressText").textContent="¡Clip listo para descargar!";toast("Tu clip está listo.");
+  }catch(err){toast(err.message||"No se pudo exportar el vídeo.");}
+  finally{clipVideo.pause();clipVideo.muted=true;btn.disabled=false;clipRecorder=null;}
+});
+
 /* ---------- archivos ---------- */
+let pdfJsLoading = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfJsLoading) return pdfJsLoading;
+  pdfJsLoading = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.onload = () => window.pdfjsLib ? resolve(window.pdfjsLib) : reject(new Error("PDF.js no disponible"));
+    script.onerror = () => reject(new Error("No se pudo descargar PDF.js"));
+    document.head.appendChild(script);
+  }).finally(() => { pdfJsLoading = null; });
+  return pdfJsLoading;
+}
 let currentFileUrl = null, currentFile = null, currentFileText = "";
 async function processFile(file) {
   currentFile = file; currentFileText = "";
@@ -823,7 +955,11 @@ async function processFile(file) {
     $("ocrBtn").hidden = false; return;
   }
   if (file.type === "application/pdf" || name.endsWith(".pdf")) {
-    if (!window.pdfjsLib) { out.textContent = "No se pudo cargar el lector PDF. Comprueba tu conexión y vuelve a intentarlo."; return; }
+    try {
+      await loadPdfJs();
+    } catch (e) {
+      out.textContent = "No se pudo cargar el lector PDF. Comprueba tu conexión y vuelve a intentarlo."; return;
+    }
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     try {
       const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
@@ -832,6 +968,7 @@ async function processFile(file) {
         const content = await (await pdf.getPage(n)).getTextContent();
         full += "\n" + content.items.map((x) => x.str).join(" ") + "\n";
       }
+      try { await pdf.destroy(); } catch (e) {}
       currentFileText = full.trim();
       out.textContent = currentFileText || "No se ha encontrado texto seleccionable. Puede ser un PDF escaneado.";
       if (pdf.numPages > 40) out.textContent += "\n\nSe han leído las primeras 40 páginas.";
@@ -861,10 +998,23 @@ async function runOcr() {
 
 /* ---------- navegación y eventos ---------- */
 function setView(name) {
+  const previous = document.querySelector(".view.active-view");
+  const previousName = previous ? previous.id.replace(/View$/, "") : "";
+  if (previousName === "clips" && name !== "clips") stopClipPreview();
+  if (previousName === "video" && name !== "video") {
+    const previewVideo = $("videoResult").querySelector("video");
+    if (previewVideo) previewVideo.pause();
+    $("videoFrame").srcdoc = ""; $("videoFrame").hidden = true;
+    $("videoRecord").textContent = "⏺ Grabar y descargar";
+    $("videoRecord").disabled = !videoCode;
+  }
+  if (previousName === "web" && name !== "web") { $("webFrame").srcdoc = ""; $("webFrame").hidden = true; }
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
+  if (name === "video" && videoCode && !$("videoFrame").srcdoc) setVideoPreview();
+  if (name === "web" && webCode && !$("webFrame").srcdoc) setPreview(webCode);
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", files: "Archivos y PDF" }[name] || "Chat";
+  $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", clips: "Clips virales", files: "Archivos y PDF" }[name] || "Chat";
   $("sidebar").classList.remove("open");
 }
 function autoresize() { promptBox.style.height = "auto"; promptBox.style.height = Math.min(promptBox.scrollHeight, 150) + "px"; }
@@ -883,20 +1033,29 @@ $("clearData").addEventListener("click", () => {
 });
 $("videoPlatform").addEventListener("change", (e) => { const p = VIDEO_PRESETS[e.target.value]; if (p) { $("videoRatio").value = p.ratio; $("videoDur").value = p.duration; if (videoCode) setVideoPreview(); } });
 $("modelSelect").addEventListener("change", (e) => {
+  if (e.target.value !== "cloud" && navigator.deviceMemory && navigator.deviceMemory <= 4) {
+    e.target.value = "cloud"; mode = "cloud"; store.set("nubi-mode", mode); updateStatus();
+    toast("En este Chromebook es mejor usar ☁ Nube: los modelos locales pueden agotar la memoria."); return;
+  }
   if (e.target.value === "cloud") releaseLocalTextEngine();
   mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") { toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica y una descarga grande." : "Cargando IA local… la primera vez descarga el modelo."); ensureLocal(MODES[mode].base).catch((err) => { toast(err.message); }); }
 });
-// Dictado por voz con Web Speech API (el navegador puede requerir conexión y permiso de micrófono).
+// Dictado por voz con Web Speech API. Requiere HTTPS, conexión y permiso de micrófono.
 const micBtn = $("micBtn"), micStatus = $("micStatus");
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null, micActive = false, dictatedText = "";
+let recognition = null, micActive = false, micStarting = false, dictatedText = "";
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.lang = "es-ES";
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.onstart = () => { micActive = true; micBtn.classList.add("recording"); micBtn.textContent = "■"; micBtn.title = "Detener dictado"; micStatus.textContent = "Te escucho… habla con claridad"; };
+  recognition.maxAlternatives = 1;
+  recognition.onstart = () => {
+    micStarting = false; micActive = true;
+    micBtn.classList.add("recording"); micBtn.textContent = "■";
+    micBtn.title = "Detener dictado"; micStatus.textContent = "Te escucho… habla con claridad";
+  };
   recognition.onresult = (event) => {
     let finalText = "", interimText = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -908,21 +1067,56 @@ if (SpeechRecognition) {
     autoresize();
   };
   recognition.onerror = (event) => {
-    const messages = { "not-allowed": "Permite el micrófono en Chrome para usar la voz.", "no-speech": "No he oído nada. Pulsa el micrófono e inténtalo otra vez.", "audio-capture": "No encuentro un micrófono conectado." };
-    micStatus.textContent = messages[event.error] || "No se pudo usar el micrófono. Inténtalo de nuevo.";
+    const messages = {
+      "not-allowed": "Micrófono bloqueado. Pulsa el candado de la dirección web → Micrófono → Permitir.",
+      "service-not-allowed": "Chrome ha bloqueado el servicio de voz. Comprueba los permisos del sitio.",
+      "no-speech": "No he oído nada. Comprueba el micrófono y vuelve a intentarlo.",
+      "audio-capture": "No encuentro un micrófono. Comprueba que el Chromebook tenga uno disponible.",
+      "network": "El reconocimiento de voz necesita conexión a Internet. Comprueba tu conexión.",
+      "aborted": "Dictado detenido."
+    };
+    micStatus.textContent = messages[event.error] || ("Error de voz: " + event.error);
   };
   recognition.onend = () => {
-    micActive = false; micBtn.classList.remove("recording"); micBtn.textContent = "🎙"; micBtn.title = "Hablar con NUBI";
+    micActive = false; micStarting = false;
+    micBtn.classList.remove("recording"); micBtn.textContent = "🎙"; micBtn.title = "Hablar con NUBI";
     if (promptBox.value.trim()) micStatus.textContent = "Dictado listo. Pulsa enviar para hablar con NUBI.";
-    else micStatus.textContent = "Texto · fotos · voz · webs · vídeos · documentos";
+    else if (micStatus.textContent === "Te escucho… habla con claridad") micStatus.textContent = "No se ha recibido voz. Vuelve a intentarlo.";
   };
-  micBtn.addEventListener("click", () => {
+  micBtn.addEventListener("click", async () => {
     if (micActive) { recognition.stop(); return; }
-    dictatedText = promptBox.value.trim() ? promptBox.value.trim() + " " : "";
-    try { recognition.start(); } catch (e) { micStatus.textContent = "Espera un momento y vuelve a pulsar el micrófono."; }
+    if (micStarting) return;
+    if (!window.isSecureContext) {
+      micStatus.textContent = "El micrófono necesita una conexión segura (HTTPS). Abre NUBI desde su dirección https://.";
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      micStatus.textContent = "Este navegador no permite acceder al micrófono. Actualiza Chrome.";
+      return;
+    }
+    micStarting = true; micBtn.disabled = true; micStatus.textContent = "Solicitando permiso para el micrófono…";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+      dictatedText = promptBox.value.trim() ? promptBox.value.trim() + " " : "";
+      micStatus.textContent = "Iniciando dictado…";
+      recognition.start();
+    } catch (err) {
+      micStarting = false;
+      const messages = {
+        "NotAllowedError": "No hay permiso. Pulsa el candado junto a la dirección web → Micrófono → Permitir.",
+        "NotFoundError": "No se detecta ningún micrófono conectado.",
+        "NotReadableError": "El micrófono está siendo usado por otra aplicación o pestaña."
+      };
+      micStatus.textContent = messages[err.name] || ("No se pudo abrir el micrófono: " + err.message);
+    } finally {
+      micBtn.disabled = false;
+    }
   });
 } else {
-  micBtn.addEventListener("click", () => { micStatus.textContent = "El dictado por voz no está disponible en este navegador. Prueba Chrome actualizado."; });
+  micBtn.addEventListener("click", () => {
+    micStatus.textContent = "Tu versión de Chrome no admite dictado por voz. Actualiza Chrome y vuelve a probar.";
+  });
 }
 $("sendBtn").addEventListener("click", () => (busy ? stopGeneration() : sendMessage()));
 promptBox.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); } });
@@ -995,5 +1189,8 @@ $("askDoc").addEventListener("click", () => {
 $("ocrBtn").addEventListener("click", runOcr);
 
 /* ---------- arranque ---------- */
+if (navigator.deviceMemory && navigator.deviceMemory <= 4 && mode !== "cloud") {
+  mode = "cloud"; store.set("nubi-mode", mode);
+}
 updateStatus(); renderHistory(); renderMessages(); renderGallery();
 /* No precargar modelos al abrir: evita que ChromeOS cierre la pestaña por falta de RAM. */
