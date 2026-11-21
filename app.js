@@ -489,10 +489,10 @@ async function chatImage(prompt) {
   if (chat.title === "Nuevo chat") chat.title = prompt.slice(0, 48);
   setBusy(true); renderMessages();
   const row = messageEl({ role: "assistant", content: "" }, 0, false); row.querySelector(".msg-actions").remove();
-  row.querySelector(".message-bubble").innerHTML = '<span class="typing"><i></i><i></i><i></i></span> Generando imagen…';
+  row.querySelector(".message-bubble").textContent = "Preparando la IA de imágenes local…";
   messagesBox.appendChild(row); messagesBox.scrollTop = messagesBox.scrollHeight;
   try {
-    const r = await makeImage({ prompt, style: "real", size: "square", seed: Math.floor(Math.random() * 1e6), svg: false });
+    const r = await makeImage({ prompt, style: "real", size: "square", seed: Math.floor(Math.random() * 1e6), svg: false, onProgress: text => { row.querySelector(".message-bubble").textContent = text; } });
     chat.messages.push({ role: "assistant", content: "", image: { url: r.url, prompt } });
     addToGallery({ url: r.url, prompt });
   } catch (err) {
@@ -533,31 +533,55 @@ async function generateSvg(prompt) {
   const clean = m[0].replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, "");
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(clean);
 }
-async function makeImage({ prompt, style, size, seed, svg }) {
-  if (!svg) {
-    const [w, h] = IMG_SIZES[size] || IMG_SIZES.square;
-    const full = encodeURIComponent(prompt + (IMG_STYLES[style] || ""));
-    const key = store.get("nubi-pkey", "");
-    const attempts = [];
-    // API actual de Pollinations (requiere clave); se conserva el endpoint gratuito legado como alternativa.
-    if (key) attempts.push("https://gen.pollinations.ai/image/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&model=black-forest-labs/flux.1-schnell&key=" + encodeURIComponent(key));
-    attempts.push("https://image.pollinations.ai/prompt/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&nologo=true&model=flux");
-    attempts.push("https://pollinations.ai/p/" + full + "?width=" + w + "&height=" + h + "&seed=" + seed + "&nologo=true&model=flux");
-    let lastError = null;
-    for (const url of attempts) {
-      try { return { url: await loadImage(url, 60000), kind: "ai" }; }
-      catch (e) { lastError = e; }
-    }
-    toast("Pollinations ha limitado o rechazado la imagen. Probando un dibujo alternativo…");
-    try { return { url: await generateSvg(prompt), kind: "svg" }; }
-    catch (e) {
-      const fallback = makePromptSvg(prompt);
-      if (fallback) return { url: fallback, kind: "svg" };
-      throw new Error("El servicio de imágenes ha alcanzado su límite gratuito (puede tardar unos 45 segundos en permitir otra imagen). " + (lastError ? lastError.message : "") + " Prueba de nuevo más tarde o añade tu clave en Configuración.");
-    }
+let localImageClient = null, localImageLoading = null, localImageReady = false;
+async function ensureLocalImageModel(onProgress = () => {}) {
+  if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
+  if (localImageClient && localImageReady) return localImageClient;
+  if (localImageLoading) return localImageLoading;
+  localImageLoading = (async () => {
+    onProgress("Preparando el motor de imágenes local…");
+    const mod = await import("https://esm.sh/web-txt2img@0.2.0");
+    const Client = mod.Txt2ImgWorkerClient || mod.default?.Txt2ImgWorkerClient;
+    if (!Client) throw new Error("No se pudo cargar el motor local de imágenes.");
+    const client = Client.createDefault();
+    const caps = await client.detect();
+    if (!caps || !caps.webgpu) throw new Error("WebGPU no está disponible en este navegador. Activa la aceleración gráfica o prueba en un dispositivo compatible.");
+    onProgress("Descargando SD-Turbo en este dispositivo (solo la primera vez)…");
+    const loaded = await client.load("sd-turbo", { backendPreference: ["webgpu"] }, p => {
+      const pct = Number.isFinite(p.pct) ? Math.round(p.pct) + "%" : "";
+      const mb = p.bytesDownloaded && p.totalBytesExpected ? " · " + (p.bytesDownloaded / 1048576).toFixed(0) + "/" + (p.totalBytesExpected / 1048576).toFixed(0) + " MB" : "";
+      onProgress((p.message || "Descargando modelo") + (pct ? " " + pct : "") + mb);
+    });
+    if (!loaded || !loaded.ok) throw new Error(loaded?.message || "No se pudo cargar SD-Turbo. Puede faltar memoria gráfica.");
+    localImageClient = client;
+    localImageReady = true;
+    return client;
+  })();
+  try { return await localImageLoading; }
+  finally { localImageLoading = null; }
+}
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("No se pudo guardar la imagen generada."));
+    reader.readAsDataURL(blob);
+  });
+}
+async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {} }) {
+  if (svg) {
+    onProgress("Creando ilustración vectorial…");
+    return { url: await generateSvg(prompt), kind: "svg" };
   }
-  try { return { url: await generateSvg(prompt), kind: "svg" }; }
-  catch (e) { return { url: makePromptSvg(prompt), kind: "svg" }; }
+  const client = await ensureLocalImageModel(onProgress);
+  const styledPrompt = prompt + (IMG_STYLES[style] || "");
+  onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
+  const task = client.generate({ prompt: styledPrompt, seed: seed || Math.floor(Math.random() * 1000000) }, p => {
+    onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"));
+  }, { busyPolicy: "queue", debounceMs: 100 });
+  const result = await task.promise;
+  if (!result || !result.ok || !result.blob) throw new Error(result?.message || "La generación local ha fallado. Cierra otras pestañas e inténtalo de nuevo.");
+  return { url: await blobToDataUrl(result.blob), kind: "local-ai" };
 }
 function makePromptSvg(prompt) {
   const safe = esc(prompt.slice(0, 140));
@@ -595,7 +619,7 @@ async function generateImageUI() {
   const stage = $("imageStage"); stage.hidden = false;
   stage.innerHTML = '<div class="skeleton"><span class="typing"><i></i><i></i><i></i></span><p>Generando… puede tardar entre 10 y 40 segundos.</p></div>';
   try {
-    const r = await makeImage({ prompt, style: $("imageStyle").value, size: $("imageSize").value, seed: Math.floor(Math.random() * 1e6), svg: $("imageSvg").checked });
+    const r = await makeImage({ prompt, style: $("imageStyle").value, size: $("imageSize").value, seed: Math.floor(Math.random() * 1e6), svg: $("imageSvg").checked, onProgress: text => { stage.querySelector("p").textContent = text; } });
     stage.innerHTML = "";
     const img = document.createElement("img"); img.src = r.url; img.alt = prompt;
     const act = document.createElement("div"); act.className = "gal-actions";
