@@ -216,6 +216,54 @@ function stopGeneration() {
 function looksFactual(q) {
   return q.length > 12 && (/\?/.test(q) || /^(qu[eé]|qui[eé]n|cu[aá]ndo|d[oó]nde|c[oó]mo|cu[aá]l|cu[aá]nt|por qu[eé]|explica|h[aá]blame|dime|define|resume)/i.test(q.trim()));
 }
+function wantsYouTube(q) {
+  return /youtube|youtu[.]be|vídeos?|videos|tutorial(?:es)?|ver cómo/i.test(q);
+}
+function wantsWebSearch(q) {
+  return /\\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\\b/i.test(q) || looksFactual(q);
+}
+async function readerText(url, ms = 9000) {
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const endpoint = "https://r.jina.ai/http://" + url.replace(/^https?:[/][/]/i, "");
+    const res = await fetch(endpoint, { signal: ctrl.signal, headers: { "Accept": "text/plain" } });
+    if (!res.ok) throw new Error("buscador " + res.status);
+    return (await res.text()).slice(0, 14000);
+  } finally { clearTimeout(timer); }
+}
+function extractSearchLinks(text, youtube = false) {
+  const found = [], seen = new Set();
+  const re = new RegExp("\\[([^\\]\\n]{2,180})\\]\\((https?:[/][/][^)\\s]+)\\)", "g");
+  let m;
+  while ((m = re.exec(text)) && found.length < 8) {
+    const url = m[2].replace(/&amp;/g, "&");
+    if (youtube && !/youtube[.]com[/]watch|youtu[.]be[/]/i.test(url)) continue;
+    if (!youtube && /duckduckgo[.]com[/]|google[.]com[/]search/i.test(url)) continue;
+    if (seen.has(url)) continue;
+    seen.add(url); found.push({ title: m[1], url });
+  }
+  if (youtube && !found.length) {
+    const ids = [...text.matchAll(/(?:youtube[.]com[/]watch[?]v=|youtu[.]be[/])([A-Za-z0-9_-]{11})/g)].map(x => x[1]);
+    [...new Set(ids)].slice(0, 6).forEach(id => found.push({ title: "Vídeo de YouTube", url: "https://www.youtube.com/watch?v=" + id }));
+  }
+  return found;
+}
+async function chatWebContext(query) {
+  const needYT = wantsYouTube(query), jobs = [];
+  if (needYT) jobs.push(readerText("https://www.youtube.com/results?search_query=" + encodeURIComponent(query), 10000).then(t => ({ kind: "YouTube", text: t })).catch(() => null));
+  if (!needYT || /internet|web|fuentes|investiga|busca/i.test(query)) jobs.push(readerText("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), 10000).then(t => ({ kind: "Web", text: t })).catch(() => null));
+  const results = (await Promise.all(jobs)).filter(Boolean);
+  if (!results.length) return "\\n\\nNo se pudo acceder a los buscadores públicos en esta ocasión. No inventes resultados ni afirmes que has buscado.";
+  let context = "\\n\\nRESULTADOS DE BÚSQUEDA (obtenidos ahora, sin API key):";
+  for (const result of results) {
+    const links = extractSearchLinks(result.text, result.kind === "YouTube");
+    context += "\\n\\n" + result.kind + ":";
+    if (!links.length) { context += "\\n" + result.text.slice(0, 3000); continue; }
+    for (const link of links.slice(0, 6)) context += "\\n- " + link.title + " — " + link.url;
+  }
+  context += "\\n\\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
+  return context.slice(0, 8500);
+}
 async function wikiContext(query, ms = 3500) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), ms);
   try {
@@ -364,6 +412,10 @@ async function respond(chat) {
   try {
     const lastUser = [...chat.messages].reverse().find((m) => m.role === "user").content;
     let extra = docContext(lastUser);
+    if (wantsWebSearch(lastUser)) {
+      bubble.textContent = "Buscando información en Internet y YouTube…";
+      extra += await chatWebContext(lastUser);
+    }
     if (wikiEnabled && !activeDoc && looksFactual(lastUser)) extra += await wikiContext(lastUser, mode === "cloud" ? 2000 : 3500);
     const msgs = [{ role: "system", content: systemPrompt(extra) }, ...toModelMessages(chat.messages)];
     const reply = await generate(msgs, { onToken: (t) => { bubble.innerHTML = md(t); messagesBox.scrollTop = messagesBox.scrollHeight; } });
