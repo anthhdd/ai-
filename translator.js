@@ -1,8 +1,8 @@
-/* NUBI AI · Traductor de vídeo inglés → subtítulos españoles.
-   Todo el procesamiento multimedia se ejecuta en el navegador. */
+/* NUBI AI · Doblaje de vídeo inglés → voz española, sin subtítulos.
+   Transcripción, traducción, síntesis de voz y exportación en el navegador. */
 const $t = (id) => document.getElementById(id);
 const fileInput = $t("translateFile");
-let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, outputUrl = null, previewUrl = null, translationAbort = null;
+let selectedVideo = null, running = false, cancelRequested = false, ffmpeg = null, transcriber = null, synthesizer = null, outputUrl = null, previewUrl = null, translationAbort = null;
 const MAX_BYTES = 60 * 1024 * 1024;
 const MAX_SECONDS = 180;
 const setStatus = (s) => { $t("translateStatus").textContent=s; $t("translateState").textContent=s; };
@@ -28,6 +28,13 @@ async function loadTranscriber(){
  transcriber=await pipeline("automatic-speech-recognition","onnx-community/whisper-tiny.en",{dtype:"q8",progress_callback:p=>{if(p.status==="progress")setProgress(4+(p.progress||0)*.18,"Descargando modelo de voz…");}});
  return transcriber;
 }
+async function loadSynthesizer(){
+ if(synthesizer)return synthesizer;
+ const {pipeline,env}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2");
+ env.allowLocalModels=false;env.useBrowserCache=true;
+ synthesizer=await pipeline("text-to-speech","Xenova/mms-tts-spa",{progress_callback:p=>{if(p.status==="progress")setProgress(34+(p.progress||0)*.12,"Descargando voz española…");}});
+ return synthesizer;
+}
 async function loadFFmpeg(){
  if(ffmpeg)return ffmpeg;
  const {FFmpeg}=await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js");
@@ -44,8 +51,6 @@ async function translateText(text){
  if(!res.ok)throw new Error("El servicio gratuito de traducción no responde ("+res.status+"). Inténtalo más tarde.");
  const data=await res.json();const out=data.choices?.[0]?.message?.content?.trim();if(!out)throw new Error("La IA no devolvió una traducción.");return out;
 }
-function timeSrt(s){const ms=Math.max(0,Math.round(s*1000)),h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),sec=Math.floor(ms%60000/1000),mil=ms%1000;return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0")+","+String(mil).padStart(3,"0");}
-function makeSrt(chunks){return chunks.map((c,i)=>{const start=c.timestamp?.[0]??0,end=c.timestamp?.[1]??start+3;return (i+1)+"\n"+timeSrt(start)+" --> "+timeSrt(Math.max(start+.3,end))+"\n"+String(c.text||"").trim()+"\n";}).join("\n");}
 async function runTranslation(){
  if(running||!selectedVideo)return;
  running=true;cancelRequested=false;$t("translateGo").disabled=true;$t("translateCancel").hidden=false;$t("translateDownload").hidden=true;resetSteps();
@@ -55,31 +60,51 @@ async function runTranslation(){
   const probe=document.createElement("video");probe.preload="metadata";audioUrl=URL.createObjectURL(selectedVideo);probe.src=audioUrl;
   await new Promise((resolve,reject)=>{probe.onloadedmetadata=resolve;probe.onerror=()=>reject(new Error("No se puede leer este vídeo. Prueba con MP4 H.264."));});
   if(!Number.isFinite(probe.duration)||probe.duration>MAX_SECONDS)throw new Error("El vídeo dura más de 3 minutos. Usa un clip más corto para proteger la memoria del Chromebook.");
-  step("load");setProgress(4,"Cargando IA de transcripción…");const asr=await loadTranscriber();if(cancelRequested)throw new Error("Proceso cancelado.");
-  step("transcribe");setProgress(26,"Extrayendo audio del vídeo…");const ff=await loadFFmpeg();
+  step("load");setProgress(4,"Cargando IA para reconocer el inglés…");const asr=await loadTranscriber();if(cancelRequested)throw new Error("Proceso cancelado.");
+  step("transcribe");setProgress(25,"Extrayendo audio inglés…");const ff=await loadFFmpeg();
   const ext=(selectedVideo.name.split(".").pop()||"mp4").toLowerCase();const input="source."+ext;
   await ff.writeFile(input,new Uint8Array(await selectedVideo.arrayBuffer()));
   await ff.exec(["-i",input,"-vn","-ac","1","-ar","16000","-c:a","pcm_s16le","audio.wav"]);
   if(cancelRequested)throw new Error("Proceso cancelado.");
-  setProgress(31,"Transcribiendo el audio inglés…");
+  setProgress(30,"Reconociendo lo que se dice…");
   const audio=await ff.readFile("audio.wav");
-  const audioContext=new AudioContext({sampleRate:16000});let audioSamples;try{const decoded=await audioContext.decodeAudioData(audio.buffer.slice(audio.byteOffset,audio.byteOffset+audio.byteLength));audioSamples=new Float32Array(decoded.getChannelData(0));}finally{await audioContext.close();}const result=await asr(audioSamples,{sampling_rate:16000,chunk_length_s:25,stride_length_s:5,return_timestamps:true});
+  const audioContext=new AudioContext({sampleRate:16000});let audioSamples;try{const decoded=await audioContext.decodeAudioData(audio.buffer.slice(audio.byteOffset,audio.byteOffset+audio.byteLength));audioSamples=new Float32Array(decoded.getChannelData(0));}finally{await audioContext.close();}
+  const result=await asr(audioSamples,{sampling_rate:16000,chunk_length_s:25,stride_length_s:5,return_timestamps:true});
   const chunks=(result.chunks||[]).filter(c=>c.text?.trim());
   if(!chunks.length)throw new Error("No se ha detectado voz en inglés.");
   step("translate");const translated=[];
-  for(let i=0;i<chunks.length;i++){if(cancelRequested)throw new Error("Proceso cancelado.");const original=chunks[i].text.trim();translated.push({...chunks[i],text:await translateText(original)});setProgress(34+(i+1)/chunks.length*35,"Traduciendo frase "+(i+1)+" de "+chunks.length+"…");}
-  step("export");setProgress(72,"Creando archivo MP4 con subtítulos…");
-  await ff.writeFile("subtitulos_es.srt",new TextEncoder().encode(makeSrt(translated)));
-  await ff.exec(["-i",input,"-i","subtitulos_es.srt","-map","0:v:0","-map","0:a?","-map","1:0","-c:v","libx264","-preset","ultrafast","-crf","27","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-c:s","mov_text","-metadata:s:s:0","language=spa","-metadata:s:s:0","title=Español","-movflags","+faststart","-shortest","video_traducido.mp4"]);
+  for(let i=0;i<chunks.length;i++){if(cancelRequested)throw new Error("Proceso cancelado.");translated.push(await translateText(chunks[i].text.trim()));setProgress(35+(i+1)/chunks.length*25,"Traduciendo frase "+(i+1)+" de "+chunks.length+"…");}
   if(cancelRequested)throw new Error("Proceso cancelado.");
-  const data=await ff.readFile("video_traducido.mp4");const blob=new Blob([data.buffer],{type:"video/mp4"});outputUrl=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=outputUrl;a.download=safeName(selectedVideo.name)+"_es.mp4";a.className="primary-button";a.textContent="↓ Descargar MP4 en español";
-  const p=document.createElement("p");p.textContent="Listo. El MP4 conserva el audio original e incluye una pista de subtítulos en español.";
+  step("voice");setProgress(61,"Preparando voz española…");const tts=await loadSynthesizer();
+  const audioParts=[];let totalSamples=0;const pause=new Float32Array(2400);
+  for(let i=0;i<translated.length;i++){
+   if(cancelRequested)throw new Error("Proceso cancelado.");
+   const spoken=await tts(translated[i]);
+   if(!spoken?.audio?.length)throw new Error("El modelo de voz no ha generado audio.");
+   const samples=spoken.sampling_rate===16000?spoken.audio:resampleAudio(spoken.audio,spoken.sampling_rate,16000);
+   audioParts.push(samples,pause);totalSamples+=samples.length+pause.length;
+   setProgress(63+(i+1)/translated.length*20,"Generando doblaje "+(i+1)+" de "+translated.length+"…");
+  }
+  const dubbed=new Float32Array(totalSamples);let offset=0;for(const part of audioParts){dubbed.set(part,offset);offset+=part.length;}
+  step("export");setProgress(85,"Creando MP4 con voz española…");
+  await ff.writeFile("doblaje.raw",new Uint8Array(dubbed.buffer));
+  await ff.exec(["-f","f32le","-ar","16000","-ac","1","-i","doblaje.raw","-c:a","pcm_s16le","doblaje.wav"]);
+  await ff.exec(["-i",input,"-i","doblaje.wav","-map","0:v:0","-map","1:a:0","-c:v","libx264","-preset","ultrafast","-crf","27","-pix_fmt","yuv420p","-c:a","aac","-b:a","128k","-af","apad","-shortest","-movflags","+faststart","video_doblado_es.mp4"]);
+  if(cancelRequested)throw new Error("Proceso cancelado.");
+  const data=await ff.readFile("video_doblado_es.mp4");const blob=new Blob([data.buffer],{type:"video/mp4"});if(outputUrl)URL.revokeObjectURL(outputUrl);outputUrl=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=outputUrl;a.download=safeName(selectedVideo.name)+"_doblado_es.mp4";a.className="primary-button";a.textContent="↓ Descargar MP4 doblado al español";
+  const p=document.createElement("p");p.textContent="Listo. El audio inglés se ha sustituido por una voz sintética en español. El vídeo no lleva subtítulos.";
   $t("translateDownload").replaceChildren(p,a);$t("translateDownload").hidden=false;
   const preview=document.createElement("video");preview.controls=true;preview.src=outputUrl;$t("translatePreviewBody").replaceChildren(preview);
-  setProgress(100,"Traducción terminada");$t("translateState").textContent="MP4 preparado";step("complete");
- }catch(err){console.error(err);setStatus(err.message||"No se pudo procesar el vídeo.");$t("translateState").textContent="Error";alert(err.message||"No se pudo procesar el vídeo.");}
+  setProgress(100,"Doblaje terminado");$t("translateState").textContent="MP4 doblado";step("complete");
+ }catch(err){console.error(err);setStatus(err.name==="AbortError"?"Proceso cancelado.":(err.message||"No se pudo doblar el vídeo."));$t("translateState").textContent="Error";if(err.name!=="AbortError")alert(err.message||"No se pudo doblar el vídeo.");}
  finally{running=false;$t("translateGo").disabled=!selectedVideo;$t("translateCancel").hidden=true;if(audioUrl)URL.revokeObjectURL(audioUrl);}
+}
+function resampleAudio(input,fromRate,toRate){
+ if(fromRate===toRate)return input;
+ const length=Math.round(input.length*toRate/fromRate),out=new Float32Array(length),ratio=fromRate/toRate;
+ for(let i=0;i<length;i++){const pos=i*ratio,left=Math.floor(pos),right=Math.min(left+1,input.length-1),mix=pos-left;out[i]=input[left]*(1-mix)+input[right]*mix;}
+ return out;
 }
 $t("translateGo").addEventListener("click",runTranslation);
 $t("translateCancel").addEventListener("click",()=>{cancelRequested=true;if(translationAbort)translationAbort.abort();setStatus("Cancelando…");});
