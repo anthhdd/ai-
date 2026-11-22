@@ -617,12 +617,13 @@ async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {}
   const client = await ensureLocalImageModel(onProgress);
   const styledPrompt = prompt + (IMG_STYLES[style] || "");
   onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
+  const dimensions = size === "wide" ? [768, 512] : size === "tall" ? [512, 768] : [512, 512];
   const result = await client.generateImage({
     model: "sd-turbo",
     prompt: styledPrompt,
     seed: seed || Math.floor(Math.random() * 1000000),
-    width: 512,
-    height: 512,
+    width: dimensions[0],
+    height: dimensions[1],
     onProgress: p => onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"))
   });
   if (!result || !result.ok || !result.blob) throw new Error(result?.message || "La generación local ha fallado. Cierra otras pestañas e inténtalo de nuevo.");
