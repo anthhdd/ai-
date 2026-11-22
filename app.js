@@ -158,7 +158,7 @@ async function cloudChat(messages, { onToken, temperature = 0.7 }) {
   } finally { clearTimeout(timer); currentAbort = null; }
 }
 
-let localEngine = null, localKey = null, localLoading = null, idleTimer = null, localTextBusy = false;
+let localEngine = null, localKey = null, localLoading = null, idleTimer = null, localTextBusy = false, localTextReleasing = null;
 /* Libera la IA local si no se usa durante 2 minutos: recupera la RAM/VRAM compartida del Chromebook. */
 function scheduleIdleUnload() {
   clearTimeout(idleTimer);
@@ -168,6 +168,7 @@ function scheduleIdleUnload() {
   }, 120000);
 }
 async function ensureLocal(base) {
+  if (localTextReleasing) await localTextReleasing;
   if (!navigator.gpu) throw new Error("Tu navegador no admite WebGPU (necesario para la IA local). Usa Chrome o Edge actualizados, o el modo ☁ Nube.");
   if (localEngine && localKey === base) return localEngine;
   if (localLoading && localLoading.key === base) return localLoading.p;
@@ -619,8 +620,9 @@ async function generateSvg(prompt) {
   const clean = m[0].replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, "");
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(clean);
 }
-let localImageModule = null, localImageLoading = null, localImageReady = false, localImageBusy = false;
+let localImageModule = null, localImageLoading = null, localImageReady = false, localImageBusy = false, localImageReleasing = null;
 async function ensureLocalImageModel(onProgress = () => {}) {
+  if (localImageReleasing) await localImageReleasing;
   if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
   if (localImageModule && localImageReady) return localImageModule;
   if (localImageLoading) return localImageLoading;
@@ -680,19 +682,23 @@ async function blobToDataUrl(blob, size = "square") {
   });
 }
 async function releaseLocalTextEngine() {
+  if (localTextReleasing) return localTextReleasing;
   if (!localEngine) return;
   const old = localEngine; localEngine = null; localKey = null;
-  try { await old.unload(); } catch (e) {}
+  localTextReleasing = Promise.resolve().then(() => old.unload()).catch(() => {}).finally(() => { localTextReleasing = null; });
+  return localTextReleasing;
 }
 let imgIdle = null, lowRamImgOk = false;
 async function releaseLocalImageModel() {
   clearTimeout(imgIdle);
+  if (localImageReleasing) return localImageReleasing;
   const mod = localImageModule;
   if (!mod) return;
   if (typeof mod.unloadModel !== "function") throw new Error("El motor de imágenes no permite liberar SD-Turbo.");
-  await mod.unloadModel("sd-turbo");
-  localImageModule = null;
-  localImageReady = false;
+  localImageReleasing = Promise.resolve().then(() => mod.unloadModel("sd-turbo")).then(() => {
+    if (localImageModule === mod) { localImageModule = null; localImageReady = false; }
+  }).finally(() => { localImageReleasing = null; });
+  return localImageReleasing;
 }
 async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {} }) {
   if (svg) {
