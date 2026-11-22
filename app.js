@@ -590,7 +590,15 @@ const IMG_STYLES = {
 };
 const IMG_SIZES = { square: [1024, 1024], wide: [1280, 720], tall: [720, 1280] };
 let gallery = store.get("nubi-gallery", []);
-function addToGallery(item) { gallery.unshift(item); gallery = gallery.slice(0, 6); if (!store.set("nubi-gallery", gallery)) { gallery = gallery.slice(0, 2); store.set("nubi-gallery", gallery); } renderGallery(); }
+function addToGallery(item) {
+  const next = [item, ...gallery].slice(0, 6);
+  if (!store.set("nubi-gallery", next)) {
+    toast("No se pudo guardar la nueva imagen por falta de espacio. Tus imágenes guardadas se mantienen.");
+    return;
+  }
+  gallery = next;
+  renderGallery();
+}
 function loadImage(url, timeout) {
   return new Promise((res, rej) => {
     const img = new Image();
@@ -976,7 +984,8 @@ async function runOcr() {
 function setView(name) {
   if (name === "translate") {
     if (localTextBusy || localImageBusy) { toast("Espera a que termine la tarea de IA local antes de abrir el traductor."); return; }
-    releaseLocalTextEngine(); releaseLocalImageModel();
+    releaseLocalTextEngine();
+    releaseLocalImageModel().catch(err => toast(err.message || "No se pudo liberar la memoria gráfica."));
   }
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
