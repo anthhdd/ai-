@@ -221,7 +221,7 @@ function wantsYouTube(q) {
   return /youtube|youtu[.]be|vídeos?|videos|tutorial(?:es)?|ver cómo/i.test(q);
 }
 function wantsWebSearch(q) {
-  return /\\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\\b/i.test(q) || looksFactual(q);
+  return /\b(busca|buscar|investiga|investigar|fuentes|noticias|actualidad|último|última|últimos|últimas|hoy|ahora mismo|en internet|en la web|en youtube|youtube|vídeos?|videos|tutorial(?:es)?)\b/i.test(q) || looksFactual(q);
 }
 async function readerText(url, ms = 9000) {
   const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), ms);
@@ -266,7 +266,7 @@ async function chatWebContext(query) {
     }));
     picked.forEach((link, i) => {
       context += "\\n- " + link.title + " — " + link.url;
-      if (pages[i]) context += "\\n  Contenido recuperado: " + pages[i].replace(/\\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
+      if (pages[i]) context += "\\n  Contenido recuperado: " + pages[i].replace(/\s+/g, " ").slice(0, result.kind === "YouTube" ? 1800 : 2200);
     });
   }
   context += "\\n\\nUtiliza estos resultados como fuentes y añade enlaces clicables. No afirmes haber visto ni escuchado un vídeo si no hay transcripción o contenido disponible. No inventes datos.";
