@@ -86,11 +86,11 @@
           <textarea id="imagePrompt" class="large-input" placeholder="Ej. Un gato astronauta explorando una ciudad futurista, luz cinematográfica..."></textarea>
           <div class="opts">
             <label>Estilo<select id="imageStyle"><option value="real">Realista</option><option value="anime">Anime</option><option value="pixel">Pixel art</option><option value="3d">Render 3D</option><option value="oil">Óleo</option><option value="logo">Logo vectorial</option><option value="none">Sin estilo</option></select></label>
-            <label>Formato<select id="imageSize"><option value="square">Cuadrado</option><option value="wide">Horizontal</option><option value="tall">Vertical</option></select></label>
+            <label>Formato (recorte central)<select id="imageSize"><option value="square">Cuadrado</option><option value="wide">Horizontal</option><option value="tall">Vertical</option></select></label>
             <label class="check"><input type="checkbox" id="imageSvg"> Modo SVG (dibujado por la IA)</label>
           </div>
           <button class="primary-button" id="imageGo">Generar imagen <span>→</span></button>
-          <p class="hint">Las imágenes se generan localmente con SD-Turbo en tu dispositivo mediante WebGPU. No se envían a un servicio de generación ni necesitan API key. La primera vez se descarga el modelo y necesitas un navegador y una GPU compatibles.</p>
+          <p class="hint">Las imágenes se generan en tu dispositivo con SD-Turbo y WebGPU, sin API key. El modelo descarga aproximadamente 2,3 GB la primera vez y puede consumir bastante memoria gráfica/RAM; en algunos Chromebook puede cerrar la pestaña. NUBI libera el modelo al terminar cada imagen. SD-Turbo genera en 512×512; los formatos horizontal y vertical se adaptan mediante recorte central.</p>
           <div class="stage" id="imageStage" hidden></div>
         </div>
         <h3 class="gallery-title" id="galleryTitle" hidden>Tus creaciones</h3>
@@ -218,7 +218,7 @@
   <div class="modal-backdrop" id="settingsModal" hidden><div class="modal">
     <button class="modal-close" id="closeSettings" aria-label="Cerrar">×</button>
     <div class="eyebrow">PREFERENCIAS</div><h2>Configuración</h2>
-    <p><b>☁ Nube rápida:</b> respuestas muy rápidas con un modelo grande. Tus mensajes se envían al servicio gratuito Pollinations (sin clave). No envíes datos privados.<br><b>⚡🧠 Local:</b> el modelo se ejecuta en tu dispositivo (WebGPU). Privado, pero más lento y menos listo; la primera vez descarga entre 0,3 y 1 GB.</p>
+    <p><b>☁ Nube rápida:</b> respuestas con el servicio gratuito Pollinations. Tus mensajes se envían a ese servicio; no envíes datos privados.<br><b>⚡🧠 Local:</b> el modelo se ejecuta en tu dispositivo (WebGPU). Se carga solo cuando envías el primer mensaje: aproximadamente 0,3 GB (0.5B), 1 GB (1.5B) o 2,4 GB (3B). La memoria usada durante la ejecución puede ser mayor que el tamaño descargado.</p>
     <label class="setting-row"><span>Reforzar con Wikipedia (preguntas de datos)</span><input type="checkbox" id="wikiToggle"></label>
     <div class="setting-row"><span>Historial</span><strong>Solo en este dispositivo</strong></div>
     <button class="primary-button danger" id="clearData">Borrar historial y datos</button>
