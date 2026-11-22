@@ -158,12 +158,12 @@ async function cloudChat(messages, { onToken, temperature = 0.7 }) {
   } finally { clearTimeout(timer); currentAbort = null; }
 }
 
-let localEngine = null, localKey = null, localLoading = null, idleTimer = null;
+let localEngine = null, localKey = null, localLoading = null, idleTimer = null, localTextBusy = false;
 /* Libera la IA local si no se usa durante 2 minutos: recupera la RAM/VRAM compartida del Chromebook. */
 function scheduleIdleUnload() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    if (busy || localLoading || !localEngine) return;
+    if (busy || localTextBusy || localLoading || !localEngine) return;
     releaseLocalTextEngine(); toast("IA local descargada de la memoria para ahorrar RAM.");
   }, 120000);
 }
@@ -202,22 +202,32 @@ function trimForLocal(messages, limit) {
   return [...sys, ...kept];
 }
 async function localChat(messages, { onToken, base, temperature = 0.6, maxTokens = 1024 }) {
-  const eng = await ensureLocal(base);
-  const flat = messages.map((m) => Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type === "text").map((p) => p.text).join("\n") } : m);
-  const msgs = trimForLocal(flat, LOW_RAM ? 3500 : 5500);
-  const sysCap = LOW_RAM ? 3000 : 4500; // el contexto de búsqueda/documentos no debe desbordar la ventana
-  if (msgs[0] && msgs[0].role === "system" && msgs[0].content.length > sysCap) msgs[0] = { ...msgs[0], content: msgs[0].content.slice(0, sysCap) };
-  const est = Math.ceil(JSON.stringify(msgs).length / 3);
-  const max = Math.max(200, Math.min(maxTokens, LOCAL_CTX - 100 - est));
-  let full = "";
-  const stream = await eng.chat.completions.create({ messages: msgs, stream: true, temperature, max_tokens: max });
-  for await (const ch of stream) {
-    const t = (ch.choices[0] && ch.choices[0].delta && ch.choices[0].delta.content) || "";
-    if (t) { full += t; onToken(full); }
-    if (stopRequested) { try { eng.interruptGenerate(); } catch (e) {} break; }
+  if (localImageBusy) throw new Error("Espera a que termine la generación de imagen antes de usar la IA local.");
+  if (localTextBusy) throw new Error("La IA local ya está ocupada. Espera a que termine la otra tarea.");
+  localTextBusy = true;
+  clearTimeout(idleTimer);
+  try {
+    clearTimeout(imgIdle);
+    await releaseLocalImageModel();
+    const eng = await ensureLocal(base);
+    const flat = messages.map((m) => Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type === "text").map((p) => p.text).join("\n") } : m);
+    const msgs = trimForLocal(flat, LOW_RAM ? 3500 : 5500);
+    const sysCap = LOW_RAM ? 3000 : 4500;
+    if (msgs[0] && msgs[0].role === "system" && msgs[0].content.length > sysCap) msgs[0] = { ...msgs[0], content: msgs[0].content.slice(0, sysCap) };
+    const est = Math.ceil(JSON.stringify(msgs).length / 3);
+    const max = Math.max(200, Math.min(maxTokens, LOCAL_CTX - 100 - est));
+    let full = "";
+    const stream = await eng.chat.completions.create({ messages: msgs, stream: true, temperature, max_tokens: max });
+    for await (const ch of stream) {
+      const t = (ch.choices[0] && ch.choices[0].delta && ch.choices[0].delta.content) || "";
+      if (t) { full += t; onToken(full); }
+      if (stopRequested) { try { eng.interruptGenerate(); } catch (e) {} break; }
+    }
+    return full;
+  } finally {
+    localTextBusy = false;
+    if (localEngine) scheduleIdleUnload();
   }
-  scheduleIdleUnload();
-  return full;
 }
 async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTokens = 1500 } = {}) {
   stopRequested = false;
@@ -226,6 +236,7 @@ async function generate(messages, { onToken = () => {}, temperature = 0.7, maxTo
     catch (err) {
       if (stopRequested) return "";
       if (!navigator.gpu) throw new Error("La IA en la nube no responde ahora mismo (" + err.message + ") y tu navegador no admite IA local. Inténtalo en unos minutos.");
+      if (LOW_RAM) throw new Error("La IA en la nube no responde (" + err.message + "). No he cargado un modelo local automáticamente para evitar un pico de memoria en este Chromebook. Reinténtalo o selecciona el modo local manualmente.");
       toast("La nube no responde. Usando IA local (la primera vez descarga el modelo)…");
       return await localChat(messages, { onToken, base: "0.5B", temperature, maxTokens });
     }
@@ -600,20 +611,20 @@ async function generateSvg(prompt) {
   const clean = m[0].replace(/<script[\s\S]*?<\/script>/gi, "").replace(/\son\w+="[^"]*"/gi, "");
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(clean);
 }
-let localImageModule = null, localImageLoading = null, localImageReady = false;
+let localImageModule = null, localImageLoading = null, localImageReady = false, localImageBusy = false;
 async function ensureLocalImageModel(onProgress = () => {}) {
   if (!navigator.gpu) throw new Error("Este dispositivo o navegador no tiene WebGPU disponible. La generación local necesita una GPU compatible. No se ha enviado tu prompt a ningún servicio.");
   if (localImageModule && localImageReady) return localImageModule;
   if (localImageLoading) return localImageLoading;
   localImageLoading = (async () => {
     onProgress("Preparando el motor local de imágenes…");
-    // Cargamos la API directa, no el Worker remoto: GitHub Pages bloquea workers de otro origen.
     const mod = await import("https://esm.sh/web-txt2img@0.3.1?bundle");
-    if (typeof mod.loadModel !== "function" || typeof mod.generateImage !== "function") {
-      throw new Error("La versión del motor local no ofrece la API directa necesaria.");
+    if (typeof mod.loadModel !== "function" || typeof mod.generateImage !== "function" || typeof mod.unloadModel !== "function") {
+      throw new Error("El motor local no ofrece la API de carga, generación y descarga de memoria necesaria.");
     }
     const caps = await mod.detectCapabilities();
     if (!caps || !caps.webgpu) throw new Error("WebGPU no está disponible en este navegador. Activa la aceleración gráfica o prueba en un dispositivo compatible.");
+    localImageModule = mod;
     onProgress("Descargando SD-Turbo en este dispositivo (solo la primera vez)…");
     const loaded = await mod.loadModel("sd-turbo", {
       backendPreference: ["webgpu"],
@@ -624,27 +635,35 @@ async function ensureLocalImageModel(onProgress = () => {}) {
       }
     });
     if (!loaded || !loaded.ok) throw new Error(loaded?.message || "No se pudo cargar SD-Turbo. Puede faltar memoria gráfica.");
-    localImageModule = mod;
     localImageReady = true;
     return mod;
   })();
   try { return await localImageLoading; }
   finally { localImageLoading = null; }
 }
-async function blobToDataUrl(blob) {
-  let compact = blob;
+async function blobToDataUrl(blob, size = "square") {
+  let compact = blob, bitmap = null, canvas = null;
   try {
-    const bitmap = await createImageBitmap(blob);
-    const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    bitmap = await createImageBitmap(blob);
+    const ratio = size === "wide" ? 1.5 : size === "tall" ? (2 / 3) : 1;
+    let sx = 0, sy = 0, sw = bitmap.width, sh = bitmap.height;
+    const sourceRatio = sw / sh;
+    if (sourceRatio > ratio) { sw = Math.max(1, Math.round(sh * ratio)); sx = Math.round((bitmap.width - sw) / 2); }
+    else if (sourceRatio < ratio) { sh = Math.max(1, Math.round(sw / ratio)); sy = Math.round((bitmap.height - sh) / 2); }
+    const outW = ratio >= 1 ? 640 : Math.round(640 * ratio);
+    const outH = ratio >= 1 ? Math.round(640 / ratio) : 640;
+    canvas = document.createElement("canvas");
+    canvas.width = outW; canvas.height = outH;
     const ctx = canvas.getContext("2d", { alpha: false });
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close();
+    if (!ctx) throw new Error("No se pudo preparar la imagen.");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, outW, outH);
     compact = await new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error("No se pudo comprimir la imagen.")), "image/jpeg", 0.78));
-    canvas.width = 1; canvas.height = 1;
-  } catch (e) {}
+  } catch (e) { compact = blob; }
+  finally {
+    if (bitmap && typeof bitmap.close === "function") bitmap.close();
+    if (canvas) { canvas.width = 1; canvas.height = 1; }
+  }
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -660,40 +679,55 @@ async function releaseLocalTextEngine() {
 let imgIdle = null, lowRamImgOk = false;
 async function releaseLocalImageModel() {
   clearTimeout(imgIdle);
-  const mod = localImageModule; localImageModule = null; localImageReady = false;
+  const mod = localImageModule;
   if (!mod) return;
-  for (const fn of ["unloadModel", "unload", "dispose", "releaseModel"]) {
-    if (typeof mod[fn] === "function") { try { await mod[fn]("sd-turbo"); } catch (e) {} break; }
-  }
+  if (typeof mod.unloadModel !== "function") throw new Error("El motor de imágenes no permite liberar SD-Turbo.");
+  await mod.unloadModel("sd-turbo");
+  localImageModule = null;
+  localImageReady = false;
 }
 async function makeImage({ prompt, style, size, seed, svg, onProgress = () => {} }) {
-  clearTimeout(imgIdle);
-  if (!svg && LOW_RAM && !localImageReady && !lowRamImgOk) {
-    if (!confirm("Este Chromebook tiene poca RAM. Generar la imagen con SD-Turbo puede cerrar la pestaña.\n\nAceptar: intentarlo igualmente.\nCancelar: usa el «Modo SVG», mucho más ligero.")) throw new Error("Cancelado. Activa «Modo SVG» para una ilustración ligera sin descargar modelos.");
-    lowRamImgOk = true;
-  }
   if (svg) {
     onProgress("Creando ilustración vectorial…");
     return { url: await generateSvg(prompt), kind: "svg" };
   }
-  onProgress("Liberando memoria de la IA de texto…");
-  await releaseLocalTextEngine();
-  const client = await ensureLocalImageModel(onProgress);
-  const styledPrompt = prompt + (IMG_STYLES[style] || "");
-  onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
-  const dimensions = size === "wide" ? [768, 512] : size === "tall" ? [512, 768] : [512, 512];
-  const result = await client.generateImage({
-    model: "sd-turbo",
-    prompt: styledPrompt,
-    seed: seed || Math.floor(Math.random() * 1000000),
-    width: dimensions[0],
-    height: dimensions[1],
-    onProgress: p => onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"))
-  });
-  if (!result || !result.ok || !result.blob) throw new Error(result?.message || "La generación local ha fallado. Cierra otras pestañas e inténtalo de nuevo.");
-  const url = await blobToDataUrl(result.blob);
-  imgIdle = setTimeout(releaseLocalImageModel, 30000); // libera la GPU/RAM 30 s después
-  return { url, kind: "local-ai" };
+  if (localTextBusy) throw new Error("Espera a que termine la respuesta de la IA local antes de generar una imagen.");
+  if (localImageBusy) throw new Error("Ya hay una imagen en proceso. Espera a que termine.");
+  if (LOW_RAM && !localImageReady && !lowRamImgOk) {
+    if (!confirm("Este Chromebook tiene poca RAM. Generar la imagen con SD-Turbo puede cerrar la pestaña.\n\nAceptar: intentarlo igualmente.\nCancelar: usa el «Modo SVG», mucho más ligero.")) throw new Error("Cancelado. Activa «Modo SVG» para una ilustración ligera sin descargar modelos.");
+    lowRamImgOk = true;
+  }
+  localImageBusy = true;
+  clearTimeout(idleTimer);
+  clearTimeout(imgIdle);
+  let generated = false;
+  try {
+    onProgress("Liberando memoria de la IA de texto…");
+    await releaseLocalTextEngine();
+    await releaseLocalImageModel();
+    const client = await ensureLocalImageModel(onProgress);
+    const styledPrompt = prompt + (IMG_STYLES[style] || "");
+    onProgress("NUBI está creando tu imagen con SD-Turbo en tu dispositivo…");
+    // SD-Turbo v1 documenta una salida nativa de 512x512; el formato se adapta con recorte central.
+    const result = await client.generateImage({
+      model: "sd-turbo",
+      prompt: styledPrompt,
+      seed: seed || Math.floor(Math.random() * 1000000),
+      width: 512,
+      height: 512,
+      onProgress: p => onProgress(p.message || (p.phase ? "Generando · " + p.phase : "Generando imagen…"))
+    });
+    if (!result || !result.ok || !result.blob) throw new Error(result?.message || "La generación local ha fallado. Cierra otras pestañas e inténtalo de nuevo.");
+    const url = await blobToDataUrl(result.blob, size);
+    generated = true;
+    return { url, kind: "local-ai" };
+  } finally {
+    localImageBusy = false;
+    if (localImageModule) {
+      const delay = LOW_RAM ? 0 : (generated ? 30000 : 5000);
+      imgIdle = setTimeout(() => releaseLocalImageModel().catch(() => toast("No se pudo liberar la memoria gráfica. Recarga NUBI antes de cambiar de modelo.")), delay);
+    }
+  }
 }
 function makePromptSvg(prompt) {
   const safe = esc(prompt.slice(0, 140));
@@ -816,15 +850,27 @@ function videoHarness(code, W, H, dur) {
   'function err(m){if(!errSent){errSent=true;parent.postMessage({type:"nubi-error",msg:String(m)},"*");}}' +
   'const CODE=' + c + ';try{draw=(new Function(CODE+"\\n;return (typeof draw===\'function\')?draw:null;"))();}catch(e){err(e);}' +
   'if(!draw)err("La animación no definió la función draw.");' +
-  'let rec=false,start=performance.now(),mr=null,chunks=[],n=0;' +
-  'function frame(now){let t=(now-start)/1000;if(rec){if(t>=DUR){rec=false;try{mr.stop();}catch(e){}t=DUR;}}else t=t%DUR;' +
+  'let rec=false,start=performance.now(),mr=null,chunks=[],n=0,paused=false,raf=0;' +
+  'function requestFrame(){if(!raf)raf=requestAnimationFrame(frame);}' +
+  'function frame(now){raf=0;if(paused&&!rec)return;let t=(now-start)/1000;if(rec){if(t>=DUR){rec=false;try{mr.stop();}catch(e){}t=DUR;}}else t=t%DUR;' +
   'if(draw){try{ctx.save();ctx.clearRect(0,0,W,H);draw(ctx,t,W,H);ctx.restore();}catch(e){err(e);}}' +
-  'if(rec&&(n++%8===0))parent.postMessage({type:"nubi-progress",p:Math.min(1,t/DUR)},"*");requestAnimationFrame(frame);}' +
-  'function startRec(){if(rec)return;const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];' +
-  'const mt=window.MediaRecorder&&types.find(x=>MediaRecorder.isTypeSupported(x));if(!mt){err("Tu navegador no puede grabar vídeo. Usa Chrome, Edge o Firefox.");return;}' +
-  'mr=new MediaRecorder(cv.captureStream(24),{mimeType:mt,videoBitsPerSecond:3500000});chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
-  'mr.onstop=()=>{parent.postMessage({type:"nubi-video",blob:new Blob(chunks,{type:mt.split(";")[0]})},"*");};mr.start(250);start=performance.now();rec=true;}' +
-  'addEventListener("message",e=>{if(e.data&&e.data.cmd==="record")startRec();});requestAnimationFrame(frame);' +
+  'if(rec&&(n++%8===0))parent.postMessage({type:"nubi-progress",p:Math.min(1,t/DUR)},"*");if(!paused||rec)requestFrame();}' +
+  'function setPaused(v){paused=!!v;if(paused&&!rec){if(raf)cancelAnimationFrame(raf);raf=0;}else if(!paused)requestFrame();}' +
+  'function startRec(){if(rec)return;errSent=false;let stream=null;try{' +
+  'if(typeof MediaRecorder==="undefined")throw new Error("Este navegador no admite MediaRecorder.");' +
+  'if(!cv.captureStream)throw new Error("Este navegador no permite capturar el lienzo.");' +
+  'const types=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm","video/mp4"];' +
+  'const mt=typeof MediaRecorder.isTypeSupported==="function"?(types.find(x=>MediaRecorder.isTypeSupported(x))||""):"";' +
+  'stream=cv.captureStream(24);mr=mt?new MediaRecorder(stream,{mimeType:mt,videoBitsPerSecond:2400000}):new MediaRecorder(stream,{videoBitsPerSecond:2400000});' +
+  'chunks=[];mr.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};' +
+  'mr.onerror=e=>{rec=false;try{if(mr.state!=="inactive")mr.stop();}catch(x){}err(e.error&&e.error.message?e.error.message:"Ha fallado la grabación del vídeo.");};' +
+  'mr.onstop=()=>{rec=false;const mime=mr.mimeType||mt||"video/webm";const blob=new Blob(chunks,{type:mime.split(";")[0]});chunks=[];stream.getTracks().forEach(t=>t.stop());' +
+  'if(!blob.size){err("La grabación terminó sin datos. Prueba de nuevo con la pestaña visible.");return;}' +
+  'parent.postMessage({type:"nubi-video",blob:blob},"*");};' +
+  'start=performance.now();rec=true;mr.start(250);requestFrame();' +
+  '}catch(e){rec=false;if(stream)stream.getTracks().forEach(t=>t.stop());err("No se pudo iniciar la grabación: "+(e.message||e));}}' +
+  'addEventListener("message",e=>{if(!e.data)return;if(e.data.cmd==="record")startRec();else if(e.data.cmd==="pause")setPaused(true);else if(e.data.cmd==="resume")setPaused(false);});' +
+  'document.addEventListener("visibilitychange",()=>setPaused(document.hidden));requestFrame();' +
   '<\/script></body></html>';
 }
 function setVideoPreview() {
@@ -928,12 +974,17 @@ async function runOcr() {
 
 /* ---------- navegación y eventos ---------- */
 function setView(name) {
-  if (name === "translate") { releaseLocalTextEngine(); releaseLocalImageModel(); }
+  if (name === "translate") {
+    if (localTextBusy || localImageBusy) { toast("Espera a que termine la tarea de IA local antes de abrir el traductor."); return; }
+    releaseLocalTextEngine(); releaseLocalImageModel();
+  }
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active-view"));
   const t = $(name + "View"); if (t) t.classList.add("active-view");
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   $("crumb").textContent = { chat: "Chat inteligente", image: "Crear imágenes", web: "Webs y apps", video: "Vídeos", translate: "Traducir vídeos", files: "Archivos y PDF" }[name] || "Chat";
   $("sidebar").classList.remove("open");
+  const frame = $("videoFrame");
+  if (frame && frame.contentWindow) frame.contentWindow.postMessage({ cmd: name === "video" ? "resume" : "pause" }, "*");
 }
 function autoresize() { promptBox.style.height = "auto"; promptBox.style.height = Math.min(promptBox.scrollHeight, 150) + "px"; }
 
@@ -950,9 +1001,19 @@ $("clearData").addEventListener("click", () => {
   renderMessages(); renderHistory(); renderGallery(); $("settingsModal").hidden = true; toast("Datos borrados");
 });
 $("videoPlatform").addEventListener("change", (e) => { const p = VIDEO_PRESETS[e.target.value]; if (p) { $("videoRatio").value = p.ratio; $("videoDur").value = p.duration; if (videoCode) setVideoPreview(); } });
+$("videoFrame").addEventListener("load", () => {
+  const visible = $("videoView").classList.contains("active-view");
+  if ($("videoFrame").contentWindow) $("videoFrame").contentWindow.postMessage({ cmd: visible ? "resume" : "pause" }, "*");
+});
 $("modelSelect").addEventListener("change", (e) => {
-  if (e.target.value === "cloud") releaseLocalTextEngine();
-  mode = e.target.value; store.set("nubi-mode", mode); updateStatus();
+  const next = e.target.value;
+  if (next === "cloud" && (localTextBusy || localImageBusy)) {
+    e.target.value = mode;
+    toast("Espera a que termine la tarea local antes de cambiar de motor.");
+    return;
+  }
+  if (next === "cloud") releaseLocalTextEngine();
+  mode = next; store.set("nubi-mode", mode); updateStatus();
   if (mode !== "cloud") toast(mode === "pro" ? "El modelo 3B necesita unos 2,4 GB de memoria gráfica. Se cargará al enviar tu primer mensaje." : "La IA local se cargará al enviar tu primer mensaje (así no gasta RAM hasta que la uses).");
 });
 // Dictado por voz con Web Speech API (el navegador puede requerir conexión y permiso de micrófono).
