@@ -178,7 +178,7 @@
         <div class="web-layout translate-layout">
           <div class="web-side tool-panel">
             <div class="field-label">Vídeo en inglés</div>
-            <label class="primary-button translate-pick-button">Seleccionar vídeo<input type="file" id="translateFile" accept="video/*,.mp4,.mov,.webm" hidden></label>
+            <label class="field-label" for="translateFile">Seleccionar archivo de vídeo</label><input class="translate-file-input" type="file" id="translateFile" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm" aria-describedby="translateFileHint">
             <small class="translate-file-hint" id="translateFileHint">MP4, MOV o WEBM · máximo 150 MB y 20 minutos</small>
             <div class="translate-file-meta" id="translateMeta" hidden></div>
             <div class="translate-steps" id="translateSteps">
